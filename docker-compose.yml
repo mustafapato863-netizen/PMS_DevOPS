@@ -1,28 +1,61 @@
-version: '3.8'
+version: "3.8"
 
 services:
-  backend:
+  db:
+    image: postgres:15-alpine
+    container_name: pms_postgres_db
+    environment:
+      POSTGRES_DB: PMS_Sys
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d PMS_Sys"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+
+  redis:
+    image: redis:7-alpine
+    container_name: pms_redis_cache
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+
+  web:
     build:
       context: ./Backend
       dockerfile: Dockerfile
-    container_name: pms-backend-api
-    restart: unless-stopped
+    container_name: pms_fastapi_app
     ports:
-      - "8000:8000"
+      - "7860:7860"
     environment:
-      - ENVIRONMENT=production
+      - DATABASE_URL=postgresql://postgres:password123@db:5432/PMS_Sys
+      - REDIS_URL=redis://redis:6379/0
+      - JWT_SECRET=super_secret_pms_dashboard_key_12345!@#
+      - JWT_ALGORITHM=HS256
+      - JWT_EXPIRE_MINUTES=60
       - PMS_DATA_DIR=/app/data
       - PMS_DEFAULT_FILE_PATH=/app/data/PMS_Trend_All.xlsx
-    volumes:
-      - pms-backend-data:/app/data
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/performance')"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
+      - PORT=7860
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: always
 
 volumes:
-  pms-backend-data:
-    name: pms-backend-data
-    driver: local
+  postgres_data:
+  redis_data:
