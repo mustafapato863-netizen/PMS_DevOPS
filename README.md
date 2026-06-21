@@ -20,16 +20,37 @@ Team definitions live in `Backend/config/teams/`.
 
 | Team | Region | KPIs | Scoring |
 | --- | --- | ---: | --- |
-| Inbound | EGY | 5 | Config-driven |
-| Outbound | EGY | 4 | Config-driven |
-| Sales | EGY | 5 | Config-driven |
-| Pre-Approvals IP Offshore | EGY | 3 | Config-driven |
-| Inbound UAE | UAE | 3 | Config-driven |
-| Pharmacy | UAE | 5 | Uncapped |
-| Coding | UAE | 3 | Capped at 100% |
-| CSR | UAE | 3 | Capped at 100% |
+| Inbound | EGY | 5 | Unified scoring model |
+| Outbound | EGY | 4 | Unified scoring model |
+| Sales | EGY | 5 | Unified scoring model |
+| Pre-Approvals IP Offshore | EGY | 3 | Unified scoring model |
+| Inbound UAE | UAE | 3 | Unified scoring model |
+| Pharmacy | UAE | 5 | Unified scoring model |
+| Coding | UAE | 3 | Unified scoring model |
+| CSR | UAE | 3 | Unified scoring model |
 
-For a direct KPI, achievement is `(actual / target) * 100`. For an inverse KPI, where lower is better, it is `(target / actual) * 100`. KPI weights, directions, grade thresholds, source columns, and capping behavior are declared in each team's JSON file.
+## KPI Scoring Model
+
+The PMS scoring engine separates KPI Achievement from KPI Contribution.
+
+KPI Achievement represents real employee performance and may exceed 100%.
+
+KPI Contribution is the capped amount used in the final score calculation.
+
+For every KPI:
+
+```text
+Direct KPI Achievement = (actual / target) * 100
+Inverse KPI Achievement = (target / actual) * 100
+Effective Achievement = min(KPI Achievement, 100)
+KPI Contribution = Effective Achievement * KPI Weight
+```
+
+The Final Performance Score is the sum of all KPI contributions.
+
+Because each KPI contribution is capped by its configured weight, the Final Performance Score can never exceed 100%.
+
+This scoring model applies consistently across all supported teams.
 
 ## Tech Stack
 

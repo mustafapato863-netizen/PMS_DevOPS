@@ -46,18 +46,41 @@ These results describe the current local workspace, including uncommitted change
 - Configurable direct/inverse KPI calculations, weights, grade thresholds, and capping rules
 - Frontend production bundle generation
 
+## KPI Scoring Rules
+
+The current scoring engine follows a unified calculation model for every supported team.
+
+1. KPI Achievement may exceed 100%.
+2. KPI Achievement is stored without capping.
+3. Effective Achievement is capped at 100% for contribution calculation.
+4. KPI Contribution is capped by the KPI's configured weight.
+5. Final Performance Score equals the sum of all KPI contributions.
+6. Final Performance Score can never exceed 100%.
+
+Example:
+
+```text
+Achievement = 165%
+Weight = 20%
+
+Effective Achievement = 100%
+Contribution = 20%
+
+Final Score remains <= 100%
+```
+
 ## Supported Teams
 
 | Team | Region | KPI count | Scoring configuration |
 | --- | --- | ---: | --- |
-| Inbound | EGY | 5 | Config-driven |
-| Outbound | EGY | 4 | Config-driven |
-| Sales | EGY | 5 | Config-driven |
-| Pre-Approvals IP Offshore | EGY | 3 | Config-driven |
-| Inbound UAE | UAE | 3 | Config-driven |
-| Pharmacy | UAE | 5 | Uncapped |
-| Coding | UAE | 3 | Capped at 100% |
-| CSR | UAE | 3 | Capped at 100% |
+| Inbound | EGY | 5 | Unified scoring model |
+| Outbound | EGY | 4 | Unified scoring model |
+| Sales | EGY | 5 | Unified scoring model |
+| Pre-Approvals IP Offshore | EGY | 3 | Unified scoring model |
+| Inbound UAE | UAE | 3 | Unified scoring model |
+| Pharmacy | UAE | 5 | Unified scoring model |
+| Coding | UAE | 3 | Unified scoring model |
+| CSR | UAE | 3 | Unified scoring model |
 
 The source of truth is `Backend/config/teams/`. Pharmacy, Coding, and CSR have focused coverage in `Backend/tests/test_three_teams.py`.
 

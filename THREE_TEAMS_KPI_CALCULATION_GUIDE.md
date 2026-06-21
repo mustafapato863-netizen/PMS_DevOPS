@@ -4,6 +4,24 @@ Last updated: June 21, 2026
 
 This guide covers the three professional UAE teams: Pharmacy, Coding, and CSR.
 
+# Universal KPI Scoring Rules
+
+These rules apply to every supported team in PMS.
+
+```text
+KPI Achievement = real calculated performance
+Effective Achievement = min(KPI Achievement, 100)
+KPI Contribution = Effective Achievement * KPI Weight
+Final Score = sum(KPI Contributions)
+Final Score <= 100
+```
+
+KPI Achievement may exceed 100%.
+
+KPI Contribution may never exceed the KPI's configured weight.
+
+The Final Performance Score may never exceed 100%.
+
 ## Scoring Rule
 
 For every KPI:
@@ -26,16 +44,18 @@ final_score = min(sum(contribution for contribution in kpis), 100)
 
 This means:
 
-- KPI achievement is uncapped and may exceed 100%.
+- KPI achievement is stored without capping and may exceed 100%.
 - KPI contribution is capped by the KPI's configured weight.
-- The final performance score is capped at 100%.
+- The final performance score is capped at 100% and follows the unified scoring model.
 
 ## Team Notes
+
+All three teams use the unified scoring model. Team-specific differences are configuration differences only (KPI definitions, weights, and directions).
 
 ### Pharmacy
 
 - Pharmacy has 5 KPIs weighted at 20% each.
-- Pharmacy KPI achievements may exceed 100%, but each KPI contribution is capped by its weight and the final score cannot exceed 100%.
+- Achievements may exceed 100% (e.g. for higher volume or faster waiting time), but each KPI contribution is capped by its weight and the final score cannot exceed 100%.
 - Typical KPI directions:
   - Waiting Time: lower is better
   - Leakage: lower is better
@@ -46,13 +66,13 @@ This means:
 ### Coding
 
 - Coding has 3 KPIs with weights 20%, 50%, and 30%.
-- KPI achievements may be calculated above 100% and are capped before contribution.
+- All 3 KPIs follow the unified scoring model where achievements may exceed 100% but contributions are capped by the configured weight.
 - Final score cannot exceed 100%.
 
 ### CSR
 
 - CSR has 3 KPIs with weights 40%, 30%, and 30%.
-- KPI achievements may be calculated above 100% and are capped before contribution.
+- All 3 KPIs follow the unified scoring model where achievements may exceed 100% but contributions are capped by the configured weight.
 - Final score cannot exceed 100%.
 
 ## Examples

@@ -160,12 +160,11 @@ Employee Profile Page Load
     │   ├─ Get actual via getActualValue()
     │   ├─ Get target via getTargetValue()
     │   ├─ Calculate achievement ratio = actual / target
-    │   ├─ NO per-KPI capping (can exceed 100%)
-    │   └─ Contribution = achievement × weight
+    │   ├─ Effective Achievement = MIN(achievement, 100)
+    │   └─ Contribution = Effective Achievement × weight
     │
-    ├─ Raw Total = SUM(contributions)
-    ├─ Final Score = MIN(rawTotal, 100)
-    └─ Returns: 0-100 capped score
+    ├─ Final Score = SUM(contributions)
+    └─ Returns: 0-100 score (capped at 100%)
     ↓
 4. Display Score: 53.6% (with 1 decimal)
 5. Calculate Grade: A/B/C/D/E based on score
@@ -389,10 +388,10 @@ Defines KPI configs per team:
 
 ### ⚠️ Trade-offs & Limitations
 
-1. **Uncapped Per-KPI Contributions**
-   - Allows one high-performing KPI to contribute > its weight%
-   - Final score still capped at 100%
-   - Example: 180% Activity (10% weight) = 18% contribution
+1. **Unified Scoring Model**
+   - KPI Achievements may exceed 100% (real employee performance is preserved).
+   - KPI Contributions are capped by the configured KPI weight (can never exceed the weight share).
+   - Final Performance Score is the sum of contributions, capped at 100%.
 
 2. **Score Calculation Race Condition** (FIXED)
    - When teamWeights not loaded yet, uses backend evaluation.score

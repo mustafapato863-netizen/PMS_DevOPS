@@ -129,8 +129,12 @@ Each file in `Backend/config/teams/` declares:
 - Grade thresholds
 - KPI keys, labels, weights, units, and colors
 - Actual and target source columns
-- `higher_better` or `lower_better` direction
-- KPI metadata including legacy capping flags; runtime scoring now preserves uncapped achievement values, caps each KPI contribution by weight, and caps final score at 100%
+- KPI metadata including configuration properties (KPI direction, weight, keys). Runtime scoring follows the unified scoring model:
+  - KPI Achievement preserves the employee's real performance and may exceed 100%.
+  - Effective Achievement is capped at 100% for contribution calculation.
+  - KPI Contribution is calculated from Effective Achievement and KPI Weight.
+  - A KPI Contribution can never exceed its configured weight share.
+  - Final Performance Score is the sum of all KPI contributions and can never exceed 100%.
 
 ## Frontend Modules
 
