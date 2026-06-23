@@ -33,7 +33,7 @@ PMS_Dashboard/
 |   |   |-- middleware/          # Authentication, RBAC, error handling
 |   |   `-- routers/             # FastAPI route modules
 |   |-- config/
-|   |   |-- teams/               # Eight JSON KPI definitions
+|   |   |-- teams/               # JSON KPI definitions used for team onboarding
 |   |   |-- database.py          # SQLAlchemy engine and sessions
 |   |   |-- loader.py            # Team configuration loading/validation
 |   |   |-- logging_config.py    # Structured logging
@@ -53,7 +53,7 @@ PMS_Dashboard/
 |   |-- alembic.ini              # Migration configuration
 |   |-- Dockerfile               # Backend container image
 |   `-- requirements.txt         # Pinned backend dependencies
-|-- Database/                    # SQL schema reference documents
+|-- Database/                    # SQL schema reference documents (pms_scheme.sql)
 |-- Frontend/
 |   |-- public/                  # Static public assets
 |   |-- src/
@@ -72,9 +72,11 @@ PMS_Dashboard/
 |   |   `-- main.tsx             # Browser entry point
 |   |-- package.json             # Scripts and dependencies
 |   `-- vite.config.ts           # Vite configuration
+|-- DATABASE_SCHEMA.md           # Database schema and relationships reference
 |-- docker-compose.yml           # PostgreSQL, Redis, backend
 |-- README.md                    # Setup and feature overview
-`-- README_PROJECT_STRUCTURE.md  # This guide
+|-- README_PROJECT_STRUCTURE.md  # This guide
+
 ```
 
 Generated logs, caches, virtual environments, package installations, and build outputs are omitted from the map.
@@ -98,7 +100,7 @@ Generated logs, caches, virtual environments, package installations, and build o
 | `bulk_operations.py` | Bulk records, KPI updates, and employee deletion |
 | `health.py` | Database/cache health reporting |
 | `vitals.py` | Frontend web-vitals ingestion |
-| `users_and_actions.py` | Users and corrective actions |
+| `users_and_actions.py` | DB-backed users and corrective actions |
 
 ### Service and Data Layers
 
@@ -136,6 +138,13 @@ Each file in `Backend/config/teams/` declares:
   - A KPI Contribution can never exceed its configured weight share.
   - Final Performance Score is the sum of all KPI contributions and can never exceed 100%.
 
+New team onboarding stays config-first:
+
+1. Add the team JSON config.
+2. Add a cleaner only if the workbook shape differs.
+3. Let `Backend/services/team_service.py` build the database payload from config when available.
+4. Verify discovery through the config and team-management APIs.
+
 ## Frontend Modules
 
 The authenticated route tree in `Frontend/src/App.tsx` includes:
@@ -148,10 +157,11 @@ The authenticated route tree in `Frontend/src/App.tsx` includes:
 | `/planning` | Planning workspace | Admin, Manager, Executive |
 | `/team-management` | Team administration | Admin |
 | `/settings` | Settings | Authenticated users |
+| `/api/users` | User management | Admin only |
 
 Unauthenticated users are redirected to `/login`. `/operational` redirects to `/team/all`.
 
-Data access is centered on `src/lib/apiClient.ts`, TanStack Query hooks under `src/hooks/api/`, and the central URLs in `src/config.ts`. Socket hooks handle real-time updates and notifications.
+Data access is centered on `src/lib/apiClient.ts`, TanStack Query hooks under `src/hooks/api/`, and the central URLs in `src/config.ts`. Socket hooks handle real-time updates and notifications, with Admin sessions subscribing to the global notification stream and Manager/Agent sessions staying scoped to assigned access.
 
 ## Configuration
 
@@ -179,12 +189,13 @@ Frontend build-time variables:
 
 ## Tests and Validation
 
-Backend tests are under `Backend/tests/`, with additional root-level backend test scripts. The suite covers routers, authentication/RBAC, repositories, services, caching, monitoring, bulk operations, soft deletion, versioning, and the three newer KPI teams.
+Backend tests are under `Backend/tests/`, with additional root-level backend test scripts. The suite covers routers, authentication/RBAC, repositories, services, caching, monitoring, bulk operations, soft deletion, versioning, and the four newer KPI teams (Coding, CSR, Pharmacy, and Submission).
 
 ```powershell
 cd Backend
 pytest tests -v
 pytest tests/test_three_teams.py -v
+pytest tests/test_submission_team.py -v
 ```
 
 Frontend validation uses the scripts declared in `Frontend/package.json`:
@@ -196,3 +207,5 @@ npm run build
 ```
 
 Avoid recording fixed passing-test counts or performance/SLA claims in this document; those values should come from the current CI run and monitoring environment.
+
+The authenticated app shell is wrapped in a root error boundary so a page crash falls back to a safe screen instead of taking down the whole UI. Browser vitals reporting in `Frontend/src/main.tsx` is best-effort and ignores a missing `/api/vitals` endpoint.

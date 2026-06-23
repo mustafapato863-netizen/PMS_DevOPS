@@ -10,9 +10,10 @@ Performance management dashboard for tracking employee KPIs across multiple oper
 - Team rosters, grade distributions, comparisons, targets, and KPI weights
 - Excel upload and team-specific data cleaning
 - Corrective actions, manager notes, audit history, soft delete, and restore
-- Configurable KPI definitions for eight teams
+- Configurable KPI definitions for nine teams, with config-driven onboarding for new teams
 - PostgreSQL repositories, Alembic migrations, Redis caching, and health checks
-- Real-time notifications over Socket.IO
+- DB-backed user administration under Settings > Users
+- Real-time notifications over Socket.IO with Admin/global delivery and Manager/Agent scoping
 
 ## Supported Teams
 
@@ -28,6 +29,7 @@ Team definitions live in `Backend/config/teams/`.
 | Pharmacy | UAE | 5 | Unified scoring model |
 | Coding | UAE | 3 | Unified scoring model |
 | CSR | UAE | 3 | Unified scoring model |
+| Submission | UAE | 2 | Unified scoring model |
 
 ## KPI Scoring Model
 
@@ -107,6 +109,8 @@ npm run dev
 
 The frontend defaults to `http://localhost:8000` for API and Socket.IO connections. Override this with `VITE_API_BASE_URL` and `VITE_SOCKET_URL`.
 
+The frontend app shell now includes a root error boundary, and web-vitals reporting is best-effort so a missing `/api/vitals` endpoint does not break the UI.
+
 ## Common Commands
 
 ```powershell
@@ -116,6 +120,9 @@ pytest tests -v
 
 # Three-team KPI tests
 pytest tests/test_three_teams.py -v
+
+# Submission team tests
+pytest tests/test_submission_team.py -v
 
 # Frontend checks and production build
 cd ..\Frontend
@@ -135,6 +142,7 @@ All API routes are mounted under `/api`.
 | Employees | `/api/employee` | list, search, create, update, soft delete, restore, notes, actions |
 | Team actions | `/api/team-actions` | list and create team actions |
 | Settings | `/api/settings` | KPI weights and targets |
+| Users | `/api/users` | DB-backed user management and login |
 | Uploads | `/api/uploads` | list, upload PMS workbook, delete upload |
 | Configuration | `/api/config/teams` | list and read team definitions |
 | Team management | `/api/team-management` | CRUD, validation, onboarding, statistics |
@@ -146,14 +154,17 @@ Interactive endpoint schemas are available in Swagger UI at `/docs` while the ba
 ## Adding a Team
 
 1. Add a validated JSON definition to `Backend/config/teams/`.
-2. Add the team cleaner to `Backend/Data_Cleaning_Teams/`.
-3. Register the cleaner in `Backend/data_cleaning/cleaner_factory.py`.
-4. Add focused configuration, calculation, cleaner, and integration tests.
-5. Run the backend suite and verify the team through the configuration API.
+2. Add the team cleaner to `Backend/Data_Cleaning_Teams/` if the Excel layout is unique.
+3. Register the cleaner in `Backend/data_cleaning/cleaner_factory.py` only when auto-discovery does not pick it up.
+4. Verify the team through `/api/config/teams`, `/api/team-management/teams`, and `/api/settings/weights`.
+5. Add focused configuration, calculation, cleaner, and integration tests.
+6. Run the focused backend tests and frontend build before merge.
 
 ## Documentation
 
 - [Project structure](README_PROJECT_STRUCTURE.md)
-- [Three-team KPI calculation guide](THREE_TEAMS_KPI_CALCULATION_GUIDE.md)
+- [Database schema and relationships](DATABASE_SCHEMA.md)
 - [System status](SYSTEM_STATUS.md)
+- [New team onboarding](NEW_TEAM_ONBOARDING.md)
+- [Three-team KPI calculation guide](THREE_TEAMS_KPI_CALCULATION_GUIDE.md)
 - [Backend notes](Backend/README.md)

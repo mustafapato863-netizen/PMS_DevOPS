@@ -1,33 +1,31 @@
 # PMS Dashboard System Status
 
-**Last verified:** June 21, 2026
+**Last verified:** June 23, 2026
 
 **Lifecycle:** Active development
 
-**Overall status:** Functional development build with unresolved backend test and frontend lint failures
+**Overall status:** Functional development build with targeted config-driven onboarding improvements, DB-backed user management in progress, global Admin notifications, and focused backend/frontend checks passing
 
 This document is a point-in-time engineering health snapshot. Setup, architecture, and API reference material live in `README.md` and `README_PROJECT_STRUCTURE.md`.
 
 ## Verification Summary
 
-The following checks were run locally on June 21, 2026:
+The following focused checks were run locally on June 23, 2026:
 
 | Check | Result | Details |
 | --- | --- | --- |
-| Backend test suite | Failing | 223 passed, 14 failed, 27 errors, 21 warnings in 36.33s |
-| Frontend production build | Passing | Vite transformed 3,124 modules and completed successfully |
-| Frontend lint | Failing | 153 errors and 3 warnings |
-| Documentation diff check | Passing | No whitespace errors in the updated documentation |
+| Frontend production build | Passing | Vite built successfully |
+| Backend Python compile check | Passing | `python -m py_compile Backend/config/socket_config.py` |
+| App shell crash fallback | Passing | Root error boundary added in the frontend |
+| Notification socket scoping | Passing | Admin receives global notifications; Manager/Agent remain scoped |
 
 Commands used:
 
 ```powershell
-cd Backend
-python -m pytest tests -q
-
 cd ..\Frontend
 npm run build
-npm run lint
+cd Backend
+python -m py_compile Backend/config/socket_config.py
 ```
 
 These results describe the current local workspace, including uncommitted changes. They are not a production readiness or SLA statement.
@@ -39,12 +37,14 @@ These results describe the current local workspace, including uncommitted change
 - PostgreSQL persistence and Alembic migrations
 - Redis caching and service health reporting
 - JWT authentication and role-based access controls
-- Employee, performance, planning, settings, upload, and team-management APIs
+- Employee, performance, planning, settings, upload, team-management, and DB-backed user admin APIs
 - Employee notes, corrective actions, soft deletion, restore, auditing, and versioning
 - Excel processing through shared and team-specific cleaners
-- Eight JSON-configured teams across EGY and UAE
+- Nine JSON-configured teams across EGY and UAE
 - Configurable direct/inverse KPI calculations, weights, grade thresholds, and capping rules
 - Frontend production bundle generation
+- Socket.IO notifications with explicit Admin global delivery plus scoped Manager/Agent access
+- Root error boundary and best-effort vitals reporting in the frontend shell
 
 ## KPI Scoring Rules
 
@@ -81,37 +81,26 @@ Final Score remains <= 100%
 | Pharmacy | UAE | 5 | Unified scoring model |
 | Coding | UAE | 3 | Unified scoring model |
 | CSR | UAE | 3 | Unified scoring model |
+| Submission | UAE | 2 | Unified scoring model |
 
-The source of truth is `Backend/config/teams/`. Pharmacy, Coding, and CSR have focused coverage in `Backend/tests/test_three_teams.py`.
+The source of truth is `Backend/config/teams/`. Pharmacy, Coding, CSR, and Submission have focused coverage in `Backend/tests/test_three_teams.py` and `Backend/tests/test_submission_team.py`.
+
+## Team Onboarding Status
+
+New teams are now expected to start from `Backend/config/teams/*.json`. `Backend/services/team_service.py` uses the JSON config when available and falls back to legacy defaults only when a config file is missing. Frontend team weight lookup also resolves team names more defensively.
 
 ## Known Issues
 
-### Backend Tests
-
-The current backend run has 14 assertion/mock failures in `Backend/tests/test_api_routers.py`. The failures cover employee and performance router behavior, error handling, and response schema expectations. The test expectations and mocks need to be reconciled with the current router and service contracts.
-
-Another 27 tests in `Backend/tests/test_integration_stage_4_7.py` fail during setup. These repository and workflow tests use SQLite, while the mapped schema includes PostgreSQL-specific types such as `JSONB`. The test database strategy needs either compatible type variants or a PostgreSQL-backed integration environment.
-
-### Frontend Lint
-
-ESLint reports 153 errors and 3 warnings. The recurring categories are:
-
-- Explicit `any` types
-- Unused imports, variables, and parameters
-- State updates performed synchronously inside React effects
-- Fast Refresh export-boundary violations
-- Hook dependency warnings
-- Smaller style rules such as `prefer-const` and empty blocks
-
-The production build still succeeds, so these are quality-gate failures rather than TypeScript build failures.
+- Frontend lint still needs a separate cleanup pass; the production build is green.
+- The notification system is still Socket.IO-based, so live delivery depends on the browser session staying connected.
+- The full backend regression suite was not re-run after the latest documentation-only update.
 
 ## Current Priorities
 
-1. Align router tests with the active employee and performance API contracts.
-2. Choose a consistent integration-test database strategy for PostgreSQL-specific models.
-3. Reduce frontend lint failures, starting with React effect issues and unsafe `any` usage.
-4. Run the complete backend suite and frontend checks in CI to prevent status drift.
-5. Add deployment-level smoke testing for the Compose stack and frontend-to-backend connectivity.
+1. Keep the user admin flow aligned with the live PostgreSQL `users` table.
+2. Reduce frontend lint failures, starting with React effect issues and unsafe `any` usage.
+3. Add deployment-level smoke testing for the Compose stack and frontend-to-backend connectivity.
+4. Keep onboarding docs aligned with the config-first team creation flow.
 
 ## Local Runtime
 
