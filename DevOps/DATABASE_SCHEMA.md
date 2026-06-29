@@ -1,17 +1,25 @@
 # Database Schema & Relationships Reference
 
+**Last verified:** June 29, 2026
+
 This document serves as a complete reference for the PMS Dashboard database schema, tables, constraints, triggers, and entity-relationship mapping.
 
 ---
 
 ## Architecture Overview
 
-The database is built on **PostgreSQL** (version 15+) and utilizes several advanced database capabilities:
-1. **Table Partitioning**: The `performance_records` table is partitioned by the `year` column to optimize query times and table size as data grows.
-2. **Materialized Views**: The summary data is pre-aggregated into a materialized view `mv_team_monthly_summary` to optimize executive dashboards and loaded concurrently for zero downtime.
-3. **Database Triggers**: Used to enforce audit logs, automatic update timestamps, and team KPI weight validation rules.
-4. **Row Level Security (RLS)**: Restricts manager view and operation scopes to their assigned teams while allowing Admin to see all.
-5. **GIN Indexes**: Employed for full-text search capability on employee names.
+The database is built on **PostgreSQL** (version 15+). The schema is prepared for scaling optimizations, with core behaviors classified as follows:
+
+### Implemented Features
+1. **GIN Indexes**: Employed for fast trigram search capability on employee names (`idx_employees_name_trgm` on `employees(name)`) and on `audit_log` JSONB fields (`new_values`, `old_values`) to support quick querying of audit histories.
+2. **Foreign Key Integrity & Composite Keys**: Enforces structural relationships. Composite foreign keys link items to partitioning-ready tables (e.g., `performance_records` and `kpi_values`).
+3. **Unique Integrity Constraints**: Database-level constraints (e.g., `uq_perf_employee_month_year`) prevent duplicate records for the same employee, month, and year.
+
+### Planned / Upcoming Features (Infrastructure Roadmap)
+1. **Table Partitioning** [Planned]: Native range partitioning of the `performance_records` table by the `year` column to optimize query times and manage sizes as data grows. Currently prepared with composite keys but implemented as a regular table.
+2. **Materialized Views** [Planned]: Pre-aggregating summary data into a materialized view `mv_team_monthly_summary` to optimize dashboard load times. Currently, calculations are executed dynamically in the application.
+3. **Database Triggers** [Planned]: Automating update timestamps (`updated_at`), audit logs, and KPI weight limits via PostgreSQL triggers. Currently, weight verification and audit logs are managed at the application/service level.
+4. **Row Level Security (RLS)** [Planned]: Database-level RLS policies to restrict manager access. Currently, scoped access is enforced in the FastAPI middleware and application logic.
 
 ---
 
@@ -159,7 +167,7 @@ Tracks history of Excel workbook uploads.
 * `error_message` (`TEXT`)
 * `uploaded_at` (`TIMESTAMPTZ`)
 
-#### `performance_records` (Partitioned)
+#### `performance_records` (Partition-Ready)
 Main record container for monthly scores.
 * `id` (`UUID`, Not Null, Default `uuid_generate_v4()`)
 * `employee_id` (`UUID`, Foreign Key referencing `employees.id`, Restrict Delete)
@@ -172,8 +180,8 @@ Main record container for monthly scores.
 * `upload_id` (`UUID`, Foreign Key referencing `upload_log.id`, Set Null on Delete)
 * `uploaded_at` (`TIMESTAMPTZ`, Default `NOW()`)
 
-> [!WARNING]
-> This table uses a composite Primary Key `(id, year)` to support native PostgreSQL range partitioning on the `year` column. Each year (e.g. 2020 through 2030) has a dedicated partition table (e.g. `performance_records_2026`).
+> [!NOTE]
+> **Partitioning Status: Planned.** This table uses a composite Primary Key `(id, year)` to support future native PostgreSQL range partitioning on the `year` column. In the future expansion phase, each year (e.g. 2020 through 2030) will be partitioned into a dedicated table (e.g. `performance_records_2026`). Currently, it is stored in a single table with composite keys.
 
 #### `kpi_values`
 Contains individual KPI details for each performance record.
@@ -228,6 +236,15 @@ Associates managers with teams they are allowed to oversee.
 * `assigned_at` (`TIMESTAMPTZ`)
 * `assigned_by` (`VARCHAR(100)`)
 
+#### `role_permissions`
+Stores permission keys mapped to user roles.
+* `id` (`UUID`, Primary Key)
+* `role` (`VARCHAR(50)`, Not Null): The role string (e.g., `'Admin'`, `'Manager'`, `'Executive'`, `'Viewer'`).
+* `permission` (`VARCHAR(100)`, Not Null): The permission identifier string (e.g., `'read:performance'`, `'write:team'`).
+
+> [!NOTE]
+> The composite key `(role, permission)` is enforced as unique (`uq_role_permission`).
+
 ---
 
 ### 5. Interventions & Notifications
@@ -253,6 +270,7 @@ Real-time Socket.IO alert records.
 * `title` / `message` (`VARCHAR`/`TEXT`)
 * `room` (`VARCHAR(100)`): Destination room (e.g. `admin`, `team_inbound`).
 * `payload` (`JSONB`): Meta payload.
+* `link` (`VARCHAR(255)`, Nullable): Navigation link for client-side redirection.
 * `created_at` (`TIMESTAMPTZ`)
 
 #### `notification_recipients`
@@ -275,7 +293,7 @@ Chronological logging of changes.
 * `record_id` (`UUID`)
 * `old_values` (`JSONB`): Row snapshot prior to transaction.
 * `new_values` (`JSONB`): Row snapshot post transaction.
-* `performed_by_user_id` (`UUID`, Foreign Key referencing `users.id`)
+* `performed_by_user_id` (`UUID`, Foreign Key referencing `users.id`, column name: `performed_by`)
 * `performed_at` (`TIMESTAMPTZ`)
 * `ip_address` (`INET`)
 
@@ -301,62 +319,68 @@ Logs HTTP request errors and tracebacks.
 
 ---
 
-## Triggers and Functions Details
+## Triggers and Functions Details [Planned]
 
-The database behavior is enhanced by several triggers:
-
-1. **`trg_users_updated_at`, `trg_teams_updated_at`, etc.**: Calls `set_updated_at()` to auto-bump the `updated_at` column.
-2. **`trg_kpi_weight_sum`**: Fires after inserts/updates on `team_kpi_config`. Calls `check_kpi_weights_sum()`, which raises an exception if the team's combined weights exceed `1.0`.
-3. **`trg_audit_*` (Users, Teams, Employees, Performance, Actions, etc.)**: Logs all `INSERT`, `UPDATE`, and `DELETE` operations automatically into the `audit_log` table with field differential JSON blocks.
-4. **`calculate_grade(p_score, p_team_id)`**: DB function to automatically grade score achievements relative to a specific team's configuration.
-
----
-
-## Materialized View Details
-
-#### `mv_team_monthly_summary`
-Aggregates summary statistics by team, year, and month:
-* Number of employees.
-* Average, maximum, and minimum score.
-* Counts per Grade (A, B, C, D, E).
-* Status distributions (Exceeds vs Below count).
-* Average KPI achievement ratio.
-
-To refresh the view concurrently without locking readers:
-```sql
-SELECT refresh_dashboard_views();
--- executes: REFRESH MATERIALIZED VIEW CONCURRENTLY mv_team_monthly_summary;
-```
+> [!IMPORTANT]
+> **Status: Planned / Missing.** Database-level triggers are not yet deployed in active migrations. All auditing, updated timestamp bumping, and weight sum validation rules (preventing team configuration weights from exceeding 100%) are currently enforced in application-level services.
+> 
+> Once implemented, the database behavior will be enhanced by the following triggers:
+> 1. **`trg_users_updated_at`, `trg_teams_updated_at`, etc.**: Calls `set_updated_at()` to auto-bump the `updated_at` column.
+> 2. **`trg_kpi_weight_sum`**: Fires after inserts/updates on `team_kpi_config`. Calls `check_kpi_weights_sum()`, which raises an exception if the team's combined weights exceed `1.0`.
+> 3. **`trg_audit_*` (Users, Teams, Employees, Performance, Actions, etc.)**: Logs all `INSERT`, `UPDATE`, and `DELETE` operations automatically into the `audit_log` table with field differential JSON blocks.
+> 4. **`calculate_grade(p_score, p_team_id)`**: DB function to automatically grade score achievements relative to a specific team's configuration.
 
 ---
 
-## Security Policies (RLS)
+## Materialized View Details [Planned]
 
-Postgres Row Level Security (RLS) enforces access limitations at the database level:
+> [!IMPORTANT]
+> **Status: Planned / Missing.** Pre-aggregation is currently handled dynamically via SQLAlchemy queries. A materialized view will be introduced in the Performance Hardening phase.
+> 
+> #### `mv_team_monthly_summary`
+> Aggregates summary statistics by team, year, and month:
+> * Number of employees.
+> * Average, maximum, and minimum score.
+> * Counts per Grade (A, B, C, D, E).
+> * Status distributions (Exceeds vs Below count).
+> * Average KPI achievement ratio.
+> 
+> To refresh the view concurrently without locking readers:
+> ```sql
+> SELECT refresh_dashboard_views();
+> -- executes: REFRESH MATERIALIZED VIEW CONCURRENTLY mv_team_monthly_summary;
+> ```
 
-```sql
--- Ensure users can only query their own record
-CREATE POLICY users_self ON users FOR SELECT 
-  USING (id = current_setting('app.current_user_id', true)::UUID);
+---
 
--- Managers can only view employees belonging to their assigned teams
-CREATE POLICY managers_view_employees ON employees FOR SELECT 
-  USING (EXISTS (
-    SELECT 1 FROM user_team_assignments uta 
-    WHERE uta.user_id = current_setting('app.current_user_id', true)::UUID 
-      AND uta.team_id = employees.team_id 
-      AND uta.access_level IN ('read', 'write', 'admin')
-  ));
+## Security Policies (RLS) [Planned]
 
--- Managers can only view performance records for their assigned teams
-CREATE POLICY managers_view_performance ON performance_records FOR SELECT 
-  USING (EXISTS (
-    SELECT 1 FROM user_team_assignments uta 
-    WHERE uta.user_id = current_setting('app.current_user_id', true)::UUID 
-      AND uta.team_id = performance_records.team_id
-  ));
-
-```
+> [!IMPORTANT]
+> **Status: Planned / Missing.** Row Level Security (RLS) is not yet active in database migrations. Security and scoped visibility (e.g. Managers only viewing assigned teams) are fully validated at the FastAPI middleware/dependency injection layers.
+> 
+> Proposed PostgreSQL RLS policies for future deployment:
+> ```sql
+> -- Ensure users can only query their own record
+> CREATE POLICY users_self ON users FOR SELECT 
+>   USING (id = current_setting('app.current_user_id', true)::UUID);
+> 
+> -- Managers can only view employees belonging to their assigned teams
+> CREATE POLICY managers_view_employees ON employees FOR SELECT 
+>   USING (EXISTS (
+>     SELECT 1 FROM user_team_assignments uta 
+>     WHERE uta.user_id = current_setting('app.current_user_id', true)::UUID 
+>       AND uta.team_id = employees.team_id 
+>       AND uta.access_level IN ('read', 'write', 'admin')
+>   ));
+> 
+> -- Managers can only view performance records for their assigned teams
+> CREATE POLICY managers_view_performance ON performance_records FOR SELECT 
+>   USING (EXISTS (
+>     SELECT 1 FROM user_team_assignments uta 
+>     WHERE uta.user_id = current_setting('app.current_user_id', true)::UUID 
+>       AND uta.team_id = performance_records.team_id
+>   ));
+> ```
 
 > [!NOTE]
-> Admin sessions are treated as global viewers in the current app/session layer, so they can receive the full notification stream while managers and agents remain scoped to their assigned access.
+> Admin sessions are treated as global viewers in the current application/session layer, so they receive the full global notification stream while managers and agents remain scoped to their assigned access.

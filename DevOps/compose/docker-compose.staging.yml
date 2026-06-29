@@ -1,0 +1,58 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: pms_postgres_db_staging
+    environment:
+      POSTGRES_DB: PMS_Sys_Staging
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: stagingpassword123
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data_staging:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d PMS_Sys_Staging"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: pms_redis_cache_staging
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data_staging:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build:
+      context: ../Backend
+      dockerfile: ../docker/Dockerfile.backend
+    container_name: pms_fastapi_app_staging
+    ports:
+      - "8080:7860"
+    environment:
+      - DATABASE_URL=postgresql://postgres:stagingpassword123@db:5432/PMS_Sys_Staging
+      - REDIS_URL=redis://redis:6379/0
+      - JWT_SECRET=stagingsecretkey12345
+      - JWT_ALGORITHM=HS256
+      - JWT_EXPIRE_MINUTES=1440
+      - PMS_DATA_DIR=/app/data
+      - PORT=7860
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: always
+
+volumes:
+  postgres_data_staging:
+  redis_data_staging:
