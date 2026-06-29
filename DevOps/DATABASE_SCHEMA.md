@@ -109,9 +109,10 @@ Stores configuration properties for individual KPIs per team.
 * `achievement_col` (`VARCHAR(100)`): Excel sheet column if achievement is pre-computed.
 * `volume_unit` (`VARCHAR(20)`): Metric volume context (e.g. `Calls`, `Cases`).
 * `display_order` (`SMALLINT`, Default `0`): UI order sequence.
+* `performance_level` (`VARCHAR(20)`, Not Null, Default `'Employee'`): Scopes the configuration level (e.g., `'Employee'`, `'Managerial'`, `'Corporate'`).
 
 > [!IMPORTANT]
-> The composite key `(team_id, kpi_key)` is unique. A trigger (`trg_kpi_weight_sum`) ensures that the sum of `weight` for any given team does not exceed `1.0` (100%).
+> The composite key `(team_id, performance_level, kpi_key)` is unique (constraint `uq_kpi_team_level_key`). A check constraint `ck_team_kpi_performance_level` ensures only valid levels are configured. A trigger (`trg_kpi_weight_sum`) ensures that the sum of `weight` for any given team + performance_level does not exceed `1.0` (100%).
 
 #### `kpi_weight_history`
 Tracks historic weight changes for auditing and performance consistency over time.
@@ -147,6 +148,7 @@ Contains employee metadata.
 * `team_id` (`UUID`, Foreign Key referencing `teams.id`, Restrict Delete)
 * `region` (`VARCHAR(10)`, Default `'UAE'`)
 * `is_active` (`BOOLEAN`, Default `TRUE`)
+* `performance_level` (`VARCHAR(20)`, Not Null, Default `'Employee'`): Role level (e.g. `'Employee'`, `'Managerial'`, `'Corporate'`) with check constraint `ck_employee_performance_level`.
 
 > [!TIP]
 > A GIN index (`idx_employees_name_trgm`) is applied on the `name` column using `gin_trgm_ops` for fast trigram searches.
@@ -179,6 +181,7 @@ Main record container for monthly scores.
 * `status` (`perf_status`, Not Null)
 * `upload_id` (`UUID`, Foreign Key referencing `upload_log.id`, Set Null on Delete)
 * `uploaded_at` (`TIMESTAMPTZ`, Default `NOW()`)
+* `performance_level` (`VARCHAR(20)`, Not Null, Default `'Employee'`): Role level monthly snapshot with check constraint `ck_performance_record_level`.
 
 > [!NOTE]
 > **Partitioning Status: Planned.** This table uses a composite Primary Key `(id, year)` to support future native PostgreSQL range partitioning on the `year` column. In the future expansion phase, each year (e.g. 2020 through 2030) will be partitioned into a dedicated table (e.g. `performance_records_2026`). Currently, it is stored in a single table with composite keys.
