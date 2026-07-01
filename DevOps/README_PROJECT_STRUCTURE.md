@@ -96,12 +96,13 @@ PMS_Dashboard/
 |   |-- public/                  # Static public assets
 |   |-- src/
 |   |   |-- components/          # Common, chart, employee, team UI
+|   |   |   `-- balanced-scorecard/ # Strategy Map, Quadrants, connectors, and BSC views
 |   |   |-- constants/           # Shared constants
 |   |   |-- context/             # Auth, role, and theme providers
 |   |   |-- data/                # Bundled frontend data
 |   |   |-- hooks/               # Query, URL, store, and socket hooks
 |   |   |-- lib/                 # API client and query client
-|   |   |-- pages/               # Route-level views
+|   |   |-- pages/               # Route-level views (e.g. BalancedScorecardView.tsx)
 |   |   |-- schemas/             # Zod validation schemas
 |   |   |-- services/            # Frontend analytics helpers
 |   |   |-- store/               # Zustand state

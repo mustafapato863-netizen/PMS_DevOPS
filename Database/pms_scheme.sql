@@ -60,25 +60,27 @@ CREATE TABLE teams (
 
 -- KPI Configuration per team
 CREATE TABLE team_kpi_config (
-  id              UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
-  team_id         UUID          NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
-  kpi_key         VARCHAR(50)   NOT NULL,
-  kpi_label       VARCHAR(100)  NOT NULL,
-  weight          NUMERIC(5,4)  NOT NULL,
-  direction       kpi_direction NOT NULL DEFAULT 'higher_better',
-  unit            kpi_unit      NOT NULL DEFAULT '%',
-  color           VARCHAR(20)   NOT NULL DEFAULT '#10B981',
-  actual_col      VARCHAR(100)  NOT NULL,
-  target_col      VARCHAR(100)  NOT NULL,
-  achievement_col VARCHAR(100),
-  volume_unit     VARCHAR(20),
-  display_order   SMALLINT      NOT NULL DEFAULT 0,
-  created_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
-  updated_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
-  updated_by      VARCHAR(100),
+  id                UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
+  team_id           UUID          NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+  kpi_key           VARCHAR(50)   NOT NULL,
+  kpi_label         VARCHAR(100)  NOT NULL,
+  weight            NUMERIC(5,4)  NOT NULL,
+  direction         kpi_direction NOT NULL DEFAULT 'higher_better',
+  unit              kpi_unit      NOT NULL DEFAULT '%',
+  color             VARCHAR(20)   NOT NULL DEFAULT '#10B981',
+  actual_col        VARCHAR(100)  NOT NULL,
+  target_col        VARCHAR(100)  NOT NULL,
+  achievement_col   VARCHAR(100),
+  volume_unit       VARCHAR(20),
+  display_order     SMALLINT      NOT NULL DEFAULT 0,
+  performance_level VARCHAR(20)   NOT NULL DEFAULT 'Employee',
+  created_at        TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+  updated_at        TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+  updated_by        VARCHAR(100),
 
-  CONSTRAINT uq_kpi_team_key  UNIQUE (team_id, kpi_key),
-  CONSTRAINT chk_kpi_weight   CHECK (weight > 0 AND weight <= 1.0)
+  CONSTRAINT uq_kpi_team_level_key UNIQUE (team_id, performance_level, kpi_key),
+  CONSTRAINT chk_kpi_weight        CHECK (weight > 0 AND weight <= 1.0),
+  CONSTRAINT ck_team_kpi_performance_level CHECK (performance_level IN ('Employee', 'Managerial', 'Corporate'))
 );
 
 -- KPI Weight History - tracks changes for historical accuracy
@@ -114,16 +116,18 @@ CREATE TABLE grade_thresholds (
 -- ============================================================
 
 CREATE TABLE employees (
-  id          UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
-  employee_id VARCHAR(50)  NOT NULL,
-  name        VARCHAR(255) NOT NULL,
-  team_id     UUID         NOT NULL REFERENCES teams(id) ON DELETE RESTRICT,
-  region      VARCHAR(10)  NOT NULL DEFAULT 'UAE',
-  is_active   BOOLEAN      NOT NULL DEFAULT TRUE,
-  created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-  updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  id                UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+  employee_id       VARCHAR(50)  NOT NULL,
+  name              VARCHAR(255) NOT NULL,
+  team_id           UUID         NOT NULL REFERENCES teams(id) ON DELETE RESTRICT,
+  region            VARCHAR(10)  NOT NULL DEFAULT 'UAE',
+  is_active         BOOLEAN      NOT NULL DEFAULT TRUE,
+  performance_level VARCHAR(20)  NOT NULL DEFAULT 'Employee',
+  created_at        TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  updated_at        TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
 
-  CONSTRAINT uq_employees_external_id UNIQUE (employee_id)
+  CONSTRAINT uq_employees_external_id UNIQUE (employee_id),
+  CONSTRAINT ck_employee_performance_level CHECK (performance_level IN ('Employee', 'Managerial', 'Corporate'))
 );
 
 -- ============================================================
@@ -149,14 +153,16 @@ CREATE TABLE users (
 
 -- User-Team assignments - scopes managers to specific teams
 CREATE TABLE user_team_assignments (
-  id           UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id      UUID         NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  team_id      UUID         NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
-  access_level access_level NOT NULL DEFAULT 'read',
-  assigned_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-  assigned_by  VARCHAR(100) NOT NULL,
+  id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id           UUID         NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  team_id           UUID         NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+  performance_level VARCHAR(20),
+  access_level      access_level NOT NULL DEFAULT 'read',
+  assigned_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  assigned_by       VARCHAR(100) NOT NULL,
 
-  CONSTRAINT uq_user_team UNIQUE (user_id, team_id)
+  CONSTRAINT uq_user_team_level UNIQUE (user_id, team_id, performance_level),
+  CONSTRAINT ck_user_team_assignment_performance_level CHECK (performance_level IS NULL OR performance_level IN ('Employee', 'Managerial', 'Corporate'))
 );
 
 -- ============================================================
@@ -184,21 +190,23 @@ CREATE TABLE upload_log (
 
 -- Main partitioned table
 CREATE TABLE performance_records (
-  id           UUID         NOT NULL DEFAULT uuid_generate_v4(),
-  employee_id  UUID         NOT NULL REFERENCES employees(id) ON DELETE RESTRICT,
-  team_id      UUID         NOT NULL REFERENCES teams(id)     ON DELETE RESTRICT,
-  month        VARCHAR(20)  NOT NULL,
-  year         SMALLINT     NOT NULL,
-  score        NUMERIC(6,2) NOT NULL,
-  grade        grade_class  NOT NULL,
-  status       perf_status  NOT NULL,
-  upload_id    UUID         REFERENCES upload_log(id) ON DELETE SET NULL,
-  uploaded_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  id                UUID         NOT NULL DEFAULT uuid_generate_v4(),
+  employee_id       UUID         NOT NULL REFERENCES employees(id) ON DELETE RESTRICT,
+  team_id           UUID         NOT NULL REFERENCES teams(id)     ON DELETE RESTRICT,
+  month             VARCHAR(20)  NOT NULL,
+  year              SMALLINT     NOT NULL,
+  score             NUMERIC(6,2) NOT NULL,
+  grade             grade_class  NOT NULL,
+  status            perf_status  NOT NULL,
+  upload_id         UUID         REFERENCES upload_log(id) ON DELETE SET NULL,
+  uploaded_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  performance_level VARCHAR(20)  NOT NULL DEFAULT 'Employee',
 
   CONSTRAINT pk_performance_records PRIMARY KEY (id, year),
   CONSTRAINT uq_perf_employee_month_year UNIQUE (employee_id, month, year),
   CONSTRAINT chk_score_range CHECK (score >= 0 AND score <= 100),
-  CONSTRAINT chk_perf_year   CHECK (year >= 2020 AND year <= 2100)
+  CONSTRAINT chk_perf_year   CHECK (year >= 2020 AND year <= 2100),
+  CONSTRAINT ck_performance_record_level CHECK (performance_level IN ('Employee', 'Managerial', 'Corporate'))
 ) PARTITION BY RANGE (year);
 
 -- Create partitions for current and future years

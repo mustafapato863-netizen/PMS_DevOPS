@@ -2,15 +2,16 @@
 
 | Metadata | Value |
 | :--- | :--- |
-| **Current Version** | `v0.8.2-stable` |
-| **Project Status** | `Ready for Infrastructure Hardening` |
-| **Last Updated** | June 2026 |
-| **Last Verified** | June 2026 |
+| **Current Version** | `v0.8.3-stable` |
+| **Project Status** | `Balanced Scorecard Integrated & Verified` |
+| **Last Updated** | July 2026 |
+| **Last Verified** | July 2026 |
 
 Performance management dashboard for tracking employee KPIs across multiple operational teams. The application combines a FastAPI API, a React frontend, PostgreSQL persistence, Redis caching, Excel ingestion, and Socket.IO notifications.
 
 ## Features
 
+- Interactive Balanced Scorecard (BSC) Workspace at Managerial and Corporate levels only, with SVG Strategy Maps and detailed Perspective summaries
 - Executive, team, employee, planning, settings, and team-management views
 - JWT authentication and role-aware UI/API access
 - Employee performance history, KPI breakdowns, trends, and recommendations
@@ -183,6 +184,13 @@ All API routes are mounted under `/api`.
 | Team management | `/api/team-management` | CRUD, validation, onboarding, statistics |
 | Bulk operations | `/api/bulk` | performance records, KPI config, employee deletion |
 | Web vitals | `/api/vitals` | frontend telemetry ingestion |
+
+### Balanced Scorecard Notes
+
+- BSC is enabled only for `Managerial` and `Corporate`.
+- The URL query state used by the workspace is `performance_level`, `branch`, `month`, `year`, `employee_ids`, `bsc_view`, `perspective`, and `kpi`.
+- The reference layout for BSC front-end work is `SGH-Hub-BSC-Demo.html`.
+- Employee dashboards remain unchanged.
 
 Interactive endpoint schemas are available in Swagger UI at `/docs` while the backend is running.
 

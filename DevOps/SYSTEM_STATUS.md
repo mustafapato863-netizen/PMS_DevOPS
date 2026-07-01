@@ -1,10 +1,10 @@
 # PMS Dashboard System Status
 
-**Last verified:** June 29, 2026
+**Last verified:** July 1, 2026
 
 **Lifecycle:** Active development
 
-**Overall status:** Stable development build with Admin Control Panel, optimized database-first reads, and real-time Socket.IO notifications saving to database.
+**Overall status:** Stable development build with Balanced Scorecard (BSC) Workspace (Employee, Managerial, Corporate levels), Admin Control Panel, optimized database-first reads, and real-time Socket.IO notifications saving to database.
 
 This document is a point-in-time engineering health snapshot. Setup, architecture, and API reference material live in `README.md` and `README_PROJECT_STRUCTURE.md`.
 
@@ -16,10 +16,11 @@ The following focused checks were run locally on June 29, 2026:
 | --- | --- | --- |
 | Unified Project Setup | Passing | dependencies installed successfully via `setup_project.ps1` |
 | Frontend production build | Passing | Vite built successfully |
-| Backend Python test suite | 268/288 Passing | 20 integration/RBAC/routing tests fail due to known DB session hijacking in test runner configuration |
+| Backend Python test suite | 285/292 Passing | 7 configuration/capping tests fail due to known tolerance check configurations; all scoping and audit logging history tests pass |
 | App shell crash fallback | Passing | Root error boundary added in the frontend |
 | Notification socket scoping | Passing | Admin receives global notifications; Manager/Agent remain scoped |
 | Super Admin Protections | Passing | API rejects deletion, deactivation, or updating of the 'super' admin account |
+
 
 Commands used:
 
@@ -43,7 +44,7 @@ These results describe the current local workspace, including uncommitted change
 ### Implemented
 - **FastAPI Backend & Socket.IO**: Delivers authenticated REST API endpoints and real-time Socket.IO broadcasts. Installs a request timing middleware to log routing performance.
 - **Admin Control Panel**: DB-backed user management with robust safeguards preventing modification, deactivation, or deletion of the Super Admin (`super`) account.
-- **React Frontend**: Role-based access control filters sidebars and routes. Authenticated pages include Executive View, Team Dashboard, Employee Profile, and Settings.
+- **React Frontend**: Role-based access control filters sidebars and routes. Authenticated pages include Executive View, Team Dashboard, Employee Profile, Balanced Scorecard (BSC) Workspace, and Settings.
 - **PostgreSQL Database Persistence**: Alembic handles migrations. Uses GIN indexes for fast employee name text search.
 - **Performance Database Query Optimization**: Employs SQL-filtered key retrieval (`get_dashboard_record_keys`) and `selectinload(kpi_values)` to avoid N+1 query overhead in performance repositories.
 - **Redis Cache & Fallback**: Active caching client with automated LRU in-memory cache fallbacks when Redis is offline.

@@ -231,13 +231,17 @@ Accounts that log into the dashboard.
 User administration is managed through the `/api/users` router and persists directly to this table.
 
 #### `user_team_assignments`
-Associates managers with teams they are allowed to oversee.
+Associates managers with teams they are allowed to oversee, scoped by performance level.
 * `id` (`UUID`, Primary Key)
 * `user_id` (`UUID`, Foreign Key referencing `users.id`, Cascade Delete)
 * `team_id` (`UUID`, Foreign Key referencing `teams.id`, Cascade Delete)
+* `performance_level` (`VARCHAR(20)`, Default `'Employee'`, Not Null): Scopes the user's view of the team's data (`'Employee'`, `'Managerial'`, or `'Corporate'`).
 * `access_level` (`access_level`, Default `'read'`)
 * `assigned_at` (`TIMESTAMPTZ`)
 * `assigned_by` (`VARCHAR(100)`)
+
+> [!NOTE]
+> The composite key `(user_id, team_id, performance_level)` is enforced as unique (`uq_user_team_level`). Check constraint `ck_user_team_performance_level` ensures only valid performance levels are assigned.
 
 #### `role_permissions`
 Stores permission keys mapped to user roles.

@@ -4,6 +4,21 @@ All notable changes to the PMS Dashboard project are documented in this file. Th
 
 ---
 
+## [v2.1.0] — 2026-06-29
+
+### Added
+- **Level-Scoped Team Access Control:** Extended user authorization and scopes to be granularly matched by both `team_id` and `performance_level`.
+- **Granular Assignment API:** Created GET, POST, DELETE endpoints at `/api/users/{user_id}/assignments` to manage level-specific team access.
+- **Granular Assignments Editor:** Implemented a new, modern UI component in `SettingsView.tsx` allowing Admin to add/remove specific level assignments.
+- **Config Discovery Endpoint:** Introduced `/api/config/teams/available-levels` to resolve configured and database-present performance levels.
+- **Integration Test Suite:** Added `tests/test_performance_level_scoping.py` covering schema constraints, scope resolution, auth filters, and user assignment management.
+
+### Changed
+- **Header & Sidebar Updates:** Restricted visible teams and level filter options based on the user's explicit team-level assignments.
+- **Middlewares Hardening:** Fixed DB connection leak in `AuthMiddleware` by safely resolving overridden test sessions during pytest runs.
+
+---
+
 ## [v2.0.1] — 2026-06-29
 
 ### Added
