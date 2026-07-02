@@ -41,6 +41,7 @@ Submission exposed two failure modes that should be treated as onboarding rules 
    - `color`
    - `actual_col`
    - `target_col`
+   - `perspective` (must be one of: `"Financial"`, `"Customer"`, `"Internal Process"`, `"Learning & Growth"`)
 5. Add a cleaner only if the Excel layout is different.
 6. Register the cleaner in `Backend/data_cleaning/cleaner_factory.py` only if auto-discovery does not find it.
 7. Verify the raw workbook column names for employee ID, employee name, and `Performance Grade` before import.
