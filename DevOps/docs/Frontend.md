@@ -13,7 +13,8 @@ Frontend/src/
 |-- components/
 |   |-- common/          # Sidebar, Header, custom Skeleton Loaders
 |   |-- employee/        # KPI Breakdown, Action History, Notes panels
-|   `-- team/            # Team KPI Cards, Roster Grids, Charts Sections
+|   |-- team/            # Team KPI Cards, Roster Grids, Charts Sections, BSC workspace shell
+|   `-- balanced-scorecard/ # Modular BSC cards, gauge, trends, and drill-down views
 |-- constants/           # Shared grades constants (A, B, C, D, E)
 |-- context/             # Authentication, Scoped Roles, Theme Providers
 |-- data/                # Fallback bundled JSON records
@@ -87,3 +88,14 @@ The frontend shares calculation logic with the backend to summarize grades and s
 - **File:** `src/utils/performanceSummary.js`
 - **Aggregation:** Groups performance records to calculate the average score, class A/B percentage, and class D/E counts across the selected scope.
 - **Headcount Warning Integration:** When the dashboard filter Month = All is selected, this utility aggregates records over all months. The UI intercepts this to display latest-month unique headcount inside the `Total Agents` card to prevent misinterpretation of aggregated record counts.
+
+## 5. Balanced Scorecard UI
+
+The BSC experience is modular instead of being held in one monolithic page.
+
+- `src/components/team/BalancedScorecardWorkspace.tsx` owns the workspace composition.
+- `src/components/balanced-scorecard/BSCRightRail.tsx` renders the key score card and contextual trend cards.
+- `src/components/balanced-scorecard/GaugeSVG.tsx` draws the score gauge.
+- `src/components/balanced-scorecard/StrategyMapView.tsx` and `PerspectiveSummaryView.tsx` handle the two main BSC views.
+
+The BSC is active for Managerial and Corporate contexts only; employee dashboards keep their existing flow.

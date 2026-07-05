@@ -96,7 +96,7 @@ PMS_Dashboard/
 |   |-- public/                  # Static public assets
 |   |-- src/
 |   |   |-- components/          # Common, chart, employee, team UI
-|   |   |   `-- balanced-scorecard/ # Strategy Map, Quadrants, connectors, and BSC views
+|   |   |   `-- balanced-scorecard/ # Modular BSC cards, gauge, trends, and scorecard views
 |   |   |-- constants/           # Shared constants
 |   |   |-- context/             # Auth, role, and theme providers
 |   |   |-- data/                # Bundled frontend data
@@ -205,6 +205,17 @@ The authenticated route tree in `Frontend/src/App.tsx` includes:
 Unauthenticated users are redirected to `/login`. `/operational` redirects to `/team/all`.
 
 Data access is centered on `src/lib/apiClient.ts`, TanStack Query hooks under `src/hooks/api/`, and the central URLs in `src/config.ts`. Socket hooks handle real-time updates and notifications, with Admin sessions subscribing to the global notification stream and Manager/Agent sessions staying scoped to assigned access.
+
+### Balanced Scorecard Frontend Layout
+
+The BSC workspace is split into focused pieces under `Frontend/src/components/balanced-scorecard/` and `Frontend/src/components/team/`:
+
+- `Frontend/src/components/team/BalancedScorecardWorkspace.tsx` composes the workspace layout.
+- `Frontend/src/components/balanced-scorecard/BSCRightRail.tsx` renders the total score card, trend cards, and selected KPI rail state.
+- `Frontend/src/components/balanced-scorecard/GaugeSVG.tsx` draws the score gauge.
+- `Frontend/src/components/balanced-scorecard/StrategyMapView.tsx` and `Frontend/src/components/balanced-scorecard/PerspectiveSummaryView.tsx` handle the two main BSC views.
+
+The old single-file demo HTML and the separate BSC session-note docs are no longer part of the active implementation.
 
 ## Configuration
 

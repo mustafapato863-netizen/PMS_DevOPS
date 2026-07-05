@@ -4,7 +4,7 @@
 
 **Lifecycle:** Active development
 
-**Overall status:** Stable development build with Balanced Scorecard (BSC) Workspace (Employee, Managerial, Corporate levels), Admin Control Panel, optimized database-first reads, and real-time Socket.IO notifications saving to database.
+**Overall status:** Stable development build with Balanced Scorecard (BSC) Workspace for Managerial and Corporate levels, Admin Control Panel, optimized database-first reads, and real-time Socket.IO notifications saving to database.
 
 This document is a point-in-time engineering health snapshot. Setup, architecture, and API reference material live in `README.md` and `README_PROJECT_STRUCTURE.md`.
 
@@ -45,6 +45,7 @@ These results describe the current local workspace, including uncommitted change
 - **FastAPI Backend & Socket.IO**: Delivers authenticated REST API endpoints and real-time Socket.IO broadcasts. Installs a request timing middleware to log routing performance.
 - **Admin Control Panel**: DB-backed user management with robust safeguards preventing modification, deactivation, or deletion of the Super Admin (`super`) account.
 - **React Frontend**: Role-based access control filters sidebars and routes. Authenticated pages include Executive View, Team Dashboard, Employee Profile, Balanced Scorecard (BSC) Workspace, and Settings.
+- **Balanced Scorecard Workspace**: Modular BSC UI with a right rail, total-score card, gauge component, score trend panels, perspective trends, and selected KPI detail views.
 - **PostgreSQL Database Persistence**: Alembic handles migrations. Uses GIN indexes for fast employee name text search.
 - **Performance Database Query Optimization**: Employs SQL-filtered key retrieval (`get_dashboard_record_keys`) and `selectinload(kpi_values)` to avoid N+1 query overhead in performance repositories.
 - **Redis Cache & Fallback**: Active caching client with automated LRU in-memory cache fallbacks when Redis is offline.
@@ -117,6 +118,7 @@ New teams are now expected to start from `Backend/config/teams/*.json`. `Backend
 2. Formulate database logical backup scripts and verify recovery procedures.
 3. Profile queries and configure slow-query logging thresholds in PostgreSQL.
 4. Reduce frontend lint failures, specifically resolving unused effects and type coercions.
+5. Keep the BSC components aligned with the shared workspace patterns instead of reintroducing the old demo layout.
 
 ---
 

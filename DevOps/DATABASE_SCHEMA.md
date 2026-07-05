@@ -111,6 +111,9 @@ Stores configuration properties for individual KPIs per team.
 * `display_order` (`SMALLINT`, Default `0`): UI order sequence.
 * `performance_level` (`VARCHAR(20)`, Not Null, Default `'Employee'`): Scopes the configuration level (e.g., `'Employee'`, `'Managerial'`, `'Corporate'`).
 
+> [!NOTE]
+> The Balanced Scorecard workspace reads these configs for `Managerial` and `Corporate` views. The same schema supports the employee dashboard path, but the BSC UI only activates for those higher performance levels.
+
 > [!IMPORTANT]
 > The composite key `(team_id, performance_level, kpi_key)` is unique (constraint `uq_kpi_team_level_key`). A check constraint `ck_team_kpi_performance_level` ensures only valid levels are configured. A trigger (`trg_kpi_weight_sum`) ensures that the sum of `weight` for any given team + performance_level does not exceed `1.0` (100%).
 
@@ -182,6 +185,9 @@ Main record container for monthly scores.
 * `upload_id` (`UUID`, Foreign Key referencing `upload_log.id`, Set Null on Delete)
 * `uploaded_at` (`TIMESTAMPTZ`, Default `NOW()`)
 * `performance_level` (`VARCHAR(20)`, Not Null, Default `'Employee'`): Role level monthly snapshot with check constraint `ck_performance_record_level`.
+
+> [!TIP]
+> BSC cards and trends summarize these records when the selected performance level is `Managerial` or `Corporate`. Employee-level records stay on the standard dashboard flow.
 
 > [!NOTE]
 > **Partitioning Status: Planned.** This table uses a composite Primary Key `(id, year)` to support future native PostgreSQL range partitioning on the `year` column. In the future expansion phase, each year (e.g. 2020 through 2030) will be partitioned into a dedicated table (e.g. `performance_records_2026`). Currently, it is stored in a single table with composite keys.

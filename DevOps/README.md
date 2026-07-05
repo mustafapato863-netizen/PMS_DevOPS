@@ -2,6 +2,8 @@
 
 This repository hosts all infrastructure-as-code, docker container definitions, proxy setups, database scripts, monitoring configurations, and operational runbooks for the PMS Dashboard platform.
 
+The active application now includes a modular Balanced Scorecard workspace for Managerial and Corporate levels. The older standalone HTML reference and session checklist files have been removed from the live docs flow.
+
 ---
 
 ## 1. Repository Structure
@@ -93,3 +95,7 @@ To deploy the entire stack (including Nginx proxy, prometheus, and grafana) to a
 - **Restore DB:** `./scripts/restore-db.sh backups/pms_backup_latest.sql`
 - **Migrations:** `./scripts/migrate.sh`
 - **Rollback:** `./scripts/rollback.sh`
+
+### Balanced Scorecard Notes
+- BSC implementation lives in the React frontend, not in this repository.
+- The old demo/reference artifacts were retired after the modular workspace landed in the main app.
