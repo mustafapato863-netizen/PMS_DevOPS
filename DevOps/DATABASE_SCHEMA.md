@@ -1,399 +1,187 @@
-# Database Schema & Relationships Reference
+# Database Schema Reference
 
-**Last verified:** June 29, 2026
+**Last verified:** July 6, 2026
 
-This document serves as a complete reference for the PMS Dashboard database schema, tables, constraints, triggers, and entity-relationship mapping.
+Source of truth:
 
----
+- ORM models: `Backend/models/models.py`
+- Migrations: `Backend/migrations/`
+- Team config JSON: `Backend/config/teams/`
 
-## Architecture Overview
+This document focuses on the tables and relationships that are active in the current codebase, including the Management BSC persistence added for the modular Balanced Scorecard flow.
 
-The database is built on **PostgreSQL** (version 15+). The schema is prepared for scaling optimizations, with core behaviors classified as follows:
+## Storage model
 
-### Implemented Features
-1. **GIN Indexes**: Employed for fast trigram search capability on employee names (`idx_employees_name_trgm` on `employees(name)`) and on `audit_log` JSONB fields (`new_values`, `old_values`) to support quick querying of audit histories.
-2. **Foreign Key Integrity & Composite Keys**: Enforces structural relationships. Composite foreign keys link items to partitioning-ready tables (e.g., `performance_records` and `kpi_values`).
-3. **Unique Integrity Constraints**: Database-level constraints (e.g., `uq_perf_employee_month_year`) prevent duplicate records for the same employee, month, and year.
+- PostgreSQL is the primary persistence store
+- Redis is used for caching, with in-memory fallback in the app layer
+- Team KPI metadata also exists in JSON under `Backend/config/teams/`
+- Database-level RLS, materialized views, and trigger-based auditing are not the active enforcement path today
 
-### Planned / Upcoming Features (Infrastructure Roadmap)
-1. **Table Partitioning** [Planned]: Native range partitioning of the `performance_records` table by the `year` column to optimize query times and manage sizes as data grows. Currently prepared with composite keys but implemented as a regular table.
-2. **Materialized Views** [Planned]: Pre-aggregating summary data into a materialized view `mv_team_monthly_summary` to optimize dashboard load times. Currently, calculations are executed dynamically in the application.
-3. **Database Triggers** [Planned]: Automating update timestamps (`updated_at`), audit logs, and KPI weight limits via PostgreSQL triggers. Currently, weight verification and audit logs are managed at the application/service level.
-4. **Row Level Security (RLS)** [Planned]: Database-level RLS policies to restrict manager access. Currently, scoped access is enforced in the FastAPI middleware and application logic.
+## Table groups
 
----
+### Team and KPI configuration
 
-## Entity-Relationship Diagram
+| Table | Purpose |
+| --- | --- |
+| `teams` | Core team registry |
+| `team_kpi_config` | Employee / Managerial / Corporate KPI config definitions |
+| `grade_thresholds` | Per-team grade cutoffs |
+| `kpi_weight_history` | Weight change history |
 
-The diagram below shows the relationships between tables:
+### Management BSC persistence
+
+| Table | Purpose |
+| --- | --- |
+| `management_kpi_config` | Period-specific BSC target and weight config for `Managerial` / `Corporate` |
+| `management_kpi_config_history` | Audit/history for uploaded or replaced management BSC config |
+| `management_kpi_snapshots` | Measured KPI actuals for named managers / positions per period |
+
+### People and monthly performance
+
+| Table | Purpose |
+| --- | --- |
+| `employees` | Employee master records |
+| `upload_log` | Workbook upload tracking |
+| `performance_records` | Monthly performance header rows |
+| `kpi_values` | KPI detail rows for each performance record |
+| `performance_record_versions` | Version history for manually changed records |
+
+### Access and security
+
+| Table | Purpose |
+| --- | --- |
+| `users` | Login accounts |
+| `user_team_assignments` | Team and level-based user scope |
+| `role_permissions` | Role-to-permission mapping |
+
+### Actions, notifications, and support
+
+| Table | Purpose |
+| --- | --- |
+| `actions` | Corrective / coaching / reward actions |
+| `notifications` | Notification events |
+| `notification_recipients` | Per-user read state |
+| `audit_log` | Application audit history |
+| `onboarding_states` | Team onboarding progress |
+| `error_logs` | Request error capture |
+
+## Core relationships
 
 ```mermaid
 erDiagram
-    TEAMS ||--o{ EMPLOYEES : "belongs to"
-    TEAMS ||--o{ TEAM_KPI_CONFIG : "has configuration"
-    TEAMS ||--o{ KPI_WEIGHT_HISTORY : "tracks weights"
-    TEAMS ||--o| GRADE_THRESHOLDS : "has grade rules"
-    TEAMS ||--o{ UPLOAD_LOG : "logs uploads"
-    TEAMS ||--o{ PERFORMANCE_RECORDS : "stores records"
-    TEAMS ||--o{ ACTIONS : "subjects to actions"
-    TEAMS ||--o| ONBOARDING_STATES : "tracks setup"
+    TEAMS ||--o{ EMPLOYEES : has
+    TEAMS ||--o{ TEAM_KPI_CONFIG : configures
+    TEAMS ||--o| GRADE_THRESHOLDS : grades
+    TEAMS ||--o{ KPI_WEIGHT_HISTORY : tracks
+    TEAMS ||--o{ UPLOAD_LOG : receives
+    TEAMS ||--o{ PERFORMANCE_RECORDS : stores
+    TEAMS ||--o{ MANAGEMENT_KPI_CONFIG : defines
+    TEAMS ||--o{ MANAGEMENT_KPI_SNAPSHOTS : measures
+    TEAMS ||--o{ MANAGEMENT_KPI_CONFIG_HISTORY : audits
+    TEAMS ||--o{ ACTIONS : owns
+    TEAMS ||--o| ONBOARDING_STATES : tracks
 
-    EMPLOYEES ||--o{ PERFORMANCE_RECORDS : "earns records"
-    EMPLOYEES ||--o{ ACTIONS : "receives actions"
-    EMPLOYEES |o--o| USERS : "assigned user account"
+    EMPLOYEES ||--o{ PERFORMANCE_RECORDS : earns
+    PERFORMANCE_RECORDS ||--o{ KPI_VALUES : contains
+    PERFORMANCE_RECORDS ||--o{ PERFORMANCE_RECORD_VERSIONS : versions
 
-    USERS ||--o{ USER_TEAM_ASSIGNMENTS : "assigned teams"
-    TEAMS ||--o{ USER_TEAM_ASSIGNMENTS : "assigned managers"
+    USERS ||--o{ USER_TEAM_ASSIGNMENTS : scoped_to
+    USERS ||--o{ ACTIONS : creates_or_updates
+    USERS ||--o{ NOTIFICATION_RECIPIENTS : receives
+    USERS ||--o{ AUDIT_LOG : performs
 
-    UPLOAD_LOG |o--o{ PERFORMANCE_RECORDS : "ingested into"
-    USERS |o--o{ UPLOAD_LOG : "performs upload"
-
-    PERFORMANCE_RECORDS ||--o{ KPI_VALUES : "holds KPI items"
-    PERFORMANCE_RECORDS ||--o{ PERFORMANCE_RECORD_VERSIONS : "tracks history"
-
-    USERS ||--o{ ACTIONS : "created or updated by"
-
-    NOTIFICATIONS ||--o{ NOTIFICATION_RECIPIENTS : "dispatched to"
-    USERS ||--o{ NOTIFICATION_RECIPIENTS : "receives alerts"
-
-    USERS ||--o{ AUDIT_LOG : "performed by user"
+    NOTIFICATIONS ||--o{ NOTIFICATION_RECIPIENTS : targets
 ```
 
----
+## Key table notes
 
-## Database Type Mappings (Enums)
+### `team_kpi_config`
 
-We define several custom Postgres Enums to enforce data integrity:
+- Holds the standard KPI metadata used by the employee dashboard and also by BSC-capable levels
+- Unique scope: `(team_id, performance_level, kpi_key)`
+- `performance_level` is constrained to `Employee`, `Managerial`, or `Corporate`
+- Indexed by `(team_id, performance_level)`
 
-| Type Name | Allowed Values | Purpose |
-| :--- | :--- | :--- |
-| `user_role` | `Admin`, `Manager`, `Executive`, `Viewer` | Controls role-based access control (RBAC) levels |
-| `access_level` | `read`, `write`, `admin` | Scopes team-manager permissions |
-| `kpi_direction`| `higher_better`, `lower_better` | Direct vs inverse KPI scoring |
-| `kpi_unit` | `%`, `currency`, `number`, `min` | Controls displaying format in the UI |
-| `grade_class` | `A`, `B`, `C`, `D`, `E` | Scoring grades based on threshold calculations |
-| `perf_status` | `Exceeds`, `Meets`, `Below` | Descriptive status tags for scores |
-| `action_type` | `Training`, `Reward`, `PIP`, `Monitor`, `Coaching`, `Warning`, `Promotion` | Type of manager corrective action |
-| `action_status`| `Open`, `In Progress`, `Completed`, `Cancelled` | Operational progress of interventions |
-| `upload_status`| `pending`, `processing`, `success`, `failed` | Ingestion status of PMS workbooks |
-| `notif_type` | `data_upload`, `action_recorded`, `grade_alert`, `system`, `warning` | Categorizes notifications |
-| `audit_op` | `INSERT`, `UPDATE`, `DELETE`, `SOFT_DELETE` | Identifies change source in audit logs |
+### `management_kpi_config`
 
----
+- Stores period-aware BSC target definitions for `Managerial` and `Corporate`
+- Scope is either by `position_name` or by `employee_identifier`
+- Uniqueness covers team, level, period, scope, and KPI key
+- Used by `ManagementBSCService` to build the active Management Overview / Strategic Overview response
 
-## Tables Detail
+Important constraints:
 
-### 1. Configuration Tables
+- `performance_level` must be `Managerial` or `Corporate`
+- exactly one of `position_name` or `employee_identifier` must be populated
+- `weight > 0`
 
-#### `teams`
-Represents the core organizational team structures.
-* `id` (`UUID`, Primary Key): Auto-generated unique identifier.
-* `name` (`VARCHAR(100)`, Unique, Not Null): URL/Code-friendly name (e.g. `inbound_egy`).
-* `db_name` (`VARCHAR(100)`, Unique, Not Null): UI-friendly or configuration name.
-* `region` (`VARCHAR(10)`, Not Null, Default `'UAE'`): Active operating country region (e.g. `'EGY'`, `'UAE'`).
-* `is_active` (`BOOLEAN`, Not Null, Default `TRUE`): Soft disable switch.
-* `created_at` / `updated_at` (`TIMESTAMPTZ`): Timestamps.
+### `management_kpi_snapshots`
 
-#### `team_kpi_config`
-Stores configuration properties for individual KPIs per team.
-* `id` (`UUID`, Primary Key)
-* `team_id` (`UUID`, Foreign Key referencing `teams.id`, Cascade Delete)
-* `kpi_key` (`VARCHAR(50)`, Not Null): Code reference string (e.g. `nps`, `qa`).
-* `kpi_label` (`VARCHAR(100)`, Not Null): UI Label text (e.g. `Quality Assurance`).
-* `weight` (`NUMERIC(5,4)`, Not Null): Decimal weight (value in range `(0.0, 1.0]`).
-* `direction` (`kpi_direction`, Not Null, Default `'higher_better'`)
-* `unit` (`kpi_unit`, Not Null, Default `'%':code:`)
-* `color` (`VARCHAR(20)`, Default `'#10B981'`): Hex code for styling UI charts.
-* `actual_col` (`VARCHAR(100)`, Not Null): Column header text in the Excel sheet for actual values.
-* `target_col` (`VARCHAR(100)`, Not Null): Column header text in the Excel sheet for target values.
-* `achievement_col` (`VARCHAR(100)`): Excel sheet column if achievement is pre-computed.
-* `volume_unit` (`VARCHAR(20)`): Metric volume context (e.g. `Calls`, `Cases`).
-* `display_order` (`SMALLINT`, Default `0`): UI order sequence.
-* `performance_level` (`VARCHAR(20)`, Not Null, Default `'Employee'`): Scopes the configuration level (e.g., `'Employee'`, `'Managerial'`, `'Corporate'`).
+- Stores actual measured KPI values for a person and period
+- Backing store for manager-specific KPI cards and Management Overview switching
+- Unique per team, employee identifier, level, period, and KPI key
 
-> [!NOTE]
-> The Balanced Scorecard workspace reads these configs for `Managerial` and `Corporate` views. The same schema supports the employee dashboard path, but the BSC UI only activates for those higher performance levels.
+### `performance_records`
 
-> [!IMPORTANT]
-> The composite key `(team_id, performance_level, kpi_key)` is unique (constraint `uq_kpi_team_level_key`). A check constraint `ck_team_kpi_performance_level` ensures only valid levels are configured. A trigger (`trg_kpi_weight_sum`) ensures that the sum of `weight` for any given team + performance_level does not exceed `1.0` (100%).
+- Composite primary key: `(id, year)`
+- This is partition-ready design, but still used as a single table today
+- Indexed by `(team_id, performance_level, month, year)`
+- Stores final score, grade, and status per employee per month
 
-#### `kpi_weight_history`
-Tracks historic weight changes for auditing and performance consistency over time.
-* `id` (`UUID`, Primary Key)
-* `team_id` (`UUID`, Foreign Key referencing `teams.id`)
-* `kpi_key` (`VARCHAR(50)`, Not Null)
-* `old_weight` / `new_weight` (`NUMERIC(5,4)`)
-* `changed_at` (`TIMESTAMPTZ`, Default `NOW()`)
-* `changed_by` (`VARCHAR(100)`)
-* `reason` (`TEXT`)
+### `kpi_values`
 
-#### `grade_thresholds`
-Calculates grade thresholds dynamically per team.
-* `id` (`UUID`, Primary Key)
-* `team_id` (`UUID`, Foreign Key referencing `teams.id`, Cascade Delete, Unique)
-* `grade_a` (`NUMERIC(5,2)`, Default `95`): Threshold score for Grade A.
-* `grade_b` (`NUMERIC(5,2)`, Default `85`): Threshold score for Grade B.
-* `grade_c` (`NUMERIC(5,2)`, Default `75`): Threshold score for Grade C.
-* `grade_d` (`NUMERIC(5,2)`, Default `65`): Threshold score for Grade D.
+- Child rows for `performance_records`
+- Uses a composite foreign key to `(record_id, record_year)`
+- Stores actual, target, raw achievement ratio, weight applied, and contribution
 
-> [!NOTE]
-> Scores below `grade_d` automatically receive Grade E. A check constraint guarantees that thresholds follow the order: `grade_a > grade_b > grade_c > grade_d > 0`.
+### `user_team_assignments`
 
----
+- Defines team access scope
+- `performance_level` may be `NULL` for legacy all-level scope, or set to `Employee`, `Managerial`, or `Corporate`
+- Current application logic uses this table for API-level authorization, especially around BSC access
 
-### 2. Core Employees Table
+### `audit_log`
 
-#### `employees`
-Contains employee metadata.
-* `id` (`UUID`, Primary Key)
-* `employee_id` (`VARCHAR(50)`, Unique, Not Null): The external organization ID imported from Excel sheets.
-* `name` (`VARCHAR(255)`, Not Null): Full name.
-* `team_id` (`UUID`, Foreign Key referencing `teams.id`, Restrict Delete)
-* `region` (`VARCHAR(10)`, Default `'UAE'`)
-* `is_active` (`BOOLEAN`, Default `TRUE`)
-* `performance_level` (`VARCHAR(20)`, Not Null, Default `'Employee'`): Role level (e.g. `'Employee'`, `'Managerial'`, `'Corporate'`) with check constraint `ck_employee_performance_level`.
+- JSON-compatible old/new value snapshots
+- Foreign key to `users` through `performed_by`
+- Application-level audit behavior is active even though DB trigger-based auditing is not the primary model
 
-> [!TIP]
-> A GIN index (`idx_employees_name_trgm`) is applied on the `name` column using `gin_trgm_ops` for fast trigram searches.
+## Indexes and constraints worth knowing
 
----
+Implemented in the models:
 
-### 3. Performance & Logs
+- `idx_kpi_config_team_level`
+- `idx_management_kpi_config_lookup`
+- `idx_management_kpi_config_batch`
+- `idx_management_kpi_snapshot_lookup`
+- `idx_management_kpi_snapshot_batch`
+- `idx_employee_perf_level`
+- `idx_perf_record_filters`
+- `idx_management_kpi_config_history_team`
+- `idx_management_kpi_config_history_batch`
+- `idx_user_team_assignment_scope`
 
-#### `upload_log`
-Tracks history of Excel workbook uploads.
-* `id` (`UUID`, Primary Key)
-* `team_id` (`UUID`, Foreign Key referencing `teams.id`)
-* `month` (`VARCHAR(20)`)
-* `year` (`SMALLINT`)
-* `record_count` (`INTEGER`, Default `0`)
-* `uploaded_by_user_id` (`UUID`, Foreign Key referencing `users.id`)
-* `status` (`upload_status`, Default `'pending'`)
-* `error_message` (`TEXT`)
-* `uploaded_at` (`TIMESTAMPTZ`)
+Important unique constraints:
 
-#### `performance_records` (Partition-Ready)
-Main record container for monthly scores.
-* `id` (`UUID`, Not Null, Default `uuid_generate_v4()`)
-* `employee_id` (`UUID`, Foreign Key referencing `employees.id`, Restrict Delete)
-* `team_id` (`UUID`, Foreign Key referencing `teams.id`, Restrict Delete)
-* `month` (`VARCHAR(20)`, Not Null)
-* `year` (`SMALLINT`, Not Null, Primary / Partition Key)
-* `score` (`NUMERIC(6,2)`, Not Null): The final calculated score, capped at 100.
-* `grade` (`grade_class`, Not Null)
-* `status` (`perf_status`, Not Null)
-* `upload_id` (`UUID`, Foreign Key referencing `upload_log.id`, Set Null on Delete)
-* `uploaded_at` (`TIMESTAMPTZ`, Default `NOW()`)
-* `performance_level` (`VARCHAR(20)`, Not Null, Default `'Employee'`): Role level monthly snapshot with check constraint `ck_performance_record_level`.
+- `uq_kpi_team_level_key`
+- `uq_management_kpi_config_scope`
+- `uq_management_kpi_snapshot_scope`
+- `uq_role_permission`
+- `uq_record_version`
 
-> [!TIP]
-> BSC cards and trends summarize these records when the selected performance level is `Managerial` or `Corporate`. Employee-level records stay on the standard dashboard flow.
+## What is enforced in app code instead of DB-first features
 
-> [!NOTE]
-> **Partitioning Status: Planned.** This table uses a composite Primary Key `(id, year)` to support future native PostgreSQL range partitioning on the `year` column. In the future expansion phase, each year (e.g. 2020 through 2030) will be partitioned into a dedicated table (e.g. `performance_records_2026`). Currently, it is stored in a single table with composite keys.
+Currently enforced mainly in services, middleware, or request logic:
 
-#### `kpi_values`
-Contains individual KPI details for each performance record.
-* `id` (`UUID`, Primary Key)
-* `record_id` (`UUID`, Not Null)
-* `record_year` (`SMALLINT`, Not Null)
-* `kpi_key` (`VARCHAR(50)`, Not Null)
-* `actual_value` / `target_value` (`NUMERIC(18,4)`)
-* `achievement_ratio` (`NUMERIC(10,4)`): Raw calculation ratio (actual / target).
-* `weight_applied` (`NUMERIC(5,4)`): Weight config used during calculation.
-* `contribution` (`NUMERIC(6,2)`): Effective score contributed (achievement ratio capped at 1.0 * weight).
+- effective authorization and team/level scoping
+- many audit decisions
+- cache fallback behavior
+- BSC response shaping and empty-state decisions
+- team onboarding workflow progression
 
-> [!IMPORTANT]
-> Since the parent `performance_records` uses a composite primary key, `kpi_values` links to it using a composite Foreign Key Constraint on `(record_id, record_year)` pointing to `performance_records(id, year)`.
+Not the active primary path today:
 
-#### `performance_record_versions`
-Tracks change history when scores are updated manually by admins.
-* `id` (`UUID`, Primary Key)
-* `original_record_id` (`UUID`, Not Null)
-* `original_record_year` (`SMALLINT`, Not Null)
-* `version_number` (`INTEGER`, Not Null)
-* `score` (`NUMERIC(6,2)`)
-* `grade` (`VARCHAR(5)`)
-* `status` (`VARCHAR(20)`)
-* `changed_by_user_id` (`UUID`, Foreign Key referencing `users.id`)
-* `changed_at` (`TIMESTAMPTZ`, Default `NOW()`)
-* `change_reason` (`TEXT`)
-
----
-
-### 4. Authentication & Security
-
-#### `users`
-Accounts that log into the dashboard.
-* `id` (`UUID`, Primary Key)
-* `employee_id` (`VARCHAR(50)`, Nullable): Links a user to their employee profile when available.
-* `username` (`VARCHAR(100)`, Unique, Not Null)
-* `email` (`VARCHAR(255)`, Unique, Not Null)
-* `password_hash` (`TEXT`, Not Null)
-* `role` (`user_role`, Default `'Viewer'`)
-* `is_active` (`BOOLEAN`, Default `TRUE`)
-* `last_login` (`TIMESTAMPTZ`)
-
-User administration is managed through the `/api/users` router and persists directly to this table.
-
-#### `user_team_assignments`
-Associates managers with teams they are allowed to oversee, scoped by performance level.
-* `id` (`UUID`, Primary Key)
-* `user_id` (`UUID`, Foreign Key referencing `users.id`, Cascade Delete)
-* `team_id` (`UUID`, Foreign Key referencing `teams.id`, Cascade Delete)
-* `performance_level` (`VARCHAR(20)`, Default `'Employee'`, Not Null): Scopes the user's view of the team's data (`'Employee'`, `'Managerial'`, or `'Corporate'`).
-* `access_level` (`access_level`, Default `'read'`)
-* `assigned_at` (`TIMESTAMPTZ`)
-* `assigned_by` (`VARCHAR(100)`)
-
-> [!NOTE]
-> The composite key `(user_id, team_id, performance_level)` is enforced as unique (`uq_user_team_level`). Check constraint `ck_user_team_performance_level` ensures only valid performance levels are assigned.
-
-#### `role_permissions`
-Stores permission keys mapped to user roles.
-* `id` (`UUID`, Primary Key)
-* `role` (`VARCHAR(50)`, Not Null): The role string (e.g., `'Admin'`, `'Manager'`, `'Executive'`, `'Viewer'`).
-* `permission` (`VARCHAR(100)`, Not Null): The permission identifier string (e.g., `'read:performance'`, `'write:team'`).
-
-> [!NOTE]
-> The composite key `(role, permission)` is enforced as unique (`uq_role_permission`).
-
----
-
-### 5. Interventions & Notifications
-
-#### `actions`
-Corrective plans, promotions, PIPs, or monitor actions set by managers for performance records.
-* `id` (`UUID`, Primary Key)
-* `employee_id` (`UUID`, Foreign Key referencing `employees.id`)
-* `team_id` (`UUID`, Foreign Key referencing `teams.id`)
-* `month` (`VARCHAR(20)`)
-* `year` (`SMALLINT`)
-* `action_type` (`action_type`, Not Null)
-* `action_text` (`TEXT`, Not Null): Notes describing the action plan.
-* `root_cause_note` (`TEXT`): Discovered root causes.
-* `status` (`action_status`, Default `'Open'`)
-* `created_by_user_id` (`UUID`, Foreign Key referencing `users.id`)
-* `created_at` (`TIMESTAMPTZ`)
-
-#### `notifications`
-Real-time Socket.IO alert records.
-* `id` (`UUID`, Primary Key)
-* `type` (`notif_type`, Not Null)
-* `title` / `message` (`VARCHAR`/`TEXT`)
-* `room` (`VARCHAR(100)`): Destination room (e.g. `admin`, `team_inbound`).
-* `payload` (`JSONB`): Meta payload.
-* `link` (`VARCHAR(255)`, Nullable): Navigation link for client-side redirection.
-* `created_at` (`TIMESTAMPTZ`)
-
-#### `notification_recipients`
-Junction table tracking read/unread status for each user target.
-* `id` (`UUID`, Primary Key)
-* `notification_id` (`UUID`, Foreign Key referencing `notifications.id`, Cascade Delete)
-* `user_id` (`UUID`, Foreign Key referencing `users.id`, Cascade Delete)
-* `is_read` (`BOOLEAN`, Default `FALSE`)
-* `read_at` (`TIMESTAMPTZ`)
-
----
-
-### 6. Audit & System Logs
-
-#### `audit_log`
-Chronological logging of changes.
-* `id` (`UUID`, Primary Key)
-* `table_name` (`VARCHAR(100)`)
-* `operation` (`audit_op`)
-* `record_id` (`UUID`)
-* `old_values` (`JSONB`): Row snapshot prior to transaction.
-* `new_values` (`JSONB`): Row snapshot post transaction.
-* `performed_by_user_id` (`UUID`, Foreign Key referencing `users.id`, column name: `performed_by`)
-* `performed_at` (`TIMESTAMPTZ`)
-* `ip_address` (`INET`)
-
-#### `onboarding_states`
-Tracks team onboarding state-machine checklist progress.
-* `id` (`UUID`, Primary Key)
-* `team_id` (`UUID`, Foreign Key referencing `teams.id`, Cascade Delete, Unique)
-* `current_step` (`INTEGER`, Default `0`)
-* `status` (`VARCHAR(20)`, Default `'pending'`)
-* `started_at` / `completed_at` (`TIMESTAMPTZ`)
-* `last_error` (`TEXT`)
-
-#### `error_logs`
-Logs HTTP request errors and tracebacks.
-* `id` (`UUID`, Primary Key)
-* `request_id` (`VARCHAR(100)`)
-* `endpoint` (`VARCHAR(255)`)
-* `method` (`VARCHAR(10)`)
-* `error_class` (`VARCHAR(100)`)
-* `error_message` (`TEXT`)
-* `stack_trace` (`TEXT`)
-* `occurred_at` (`TIMESTAMPTZ`)
-
----
-
-## Triggers and Functions Details [Planned]
-
-> [!IMPORTANT]
-> **Status: Planned / Missing.** Database-level triggers are not yet deployed in active migrations. All auditing, updated timestamp bumping, and weight sum validation rules (preventing team configuration weights from exceeding 100%) are currently enforced in application-level services.
-> 
-> Once implemented, the database behavior will be enhanced by the following triggers:
-> 1. **`trg_users_updated_at`, `trg_teams_updated_at`, etc.**: Calls `set_updated_at()` to auto-bump the `updated_at` column.
-> 2. **`trg_kpi_weight_sum`**: Fires after inserts/updates on `team_kpi_config`. Calls `check_kpi_weights_sum()`, which raises an exception if the team's combined weights exceed `1.0`.
-> 3. **`trg_audit_*` (Users, Teams, Employees, Performance, Actions, etc.)**: Logs all `INSERT`, `UPDATE`, and `DELETE` operations automatically into the `audit_log` table with field differential JSON blocks.
-> 4. **`calculate_grade(p_score, p_team_id)`**: DB function to automatically grade score achievements relative to a specific team's configuration.
-
----
-
-## Materialized View Details [Planned]
-
-> [!IMPORTANT]
-> **Status: Planned / Missing.** Pre-aggregation is currently handled dynamically via SQLAlchemy queries. A materialized view will be introduced in the Performance Hardening phase.
-> 
-> #### `mv_team_monthly_summary`
-> Aggregates summary statistics by team, year, and month:
-> * Number of employees.
-> * Average, maximum, and minimum score.
-> * Counts per Grade (A, B, C, D, E).
-> * Status distributions (Exceeds vs Below count).
-> * Average KPI achievement ratio.
-> 
-> To refresh the view concurrently without locking readers:
-> ```sql
-> SELECT refresh_dashboard_views();
-> -- executes: REFRESH MATERIALIZED VIEW CONCURRENTLY mv_team_monthly_summary;
-> ```
-
----
-
-## Security Policies (RLS) [Planned]
-
-> [!IMPORTANT]
-> **Status: Planned / Missing.** Row Level Security (RLS) is not yet active in database migrations. Security and scoped visibility (e.g. Managers only viewing assigned teams) are fully validated at the FastAPI middleware/dependency injection layers.
-> 
-> Proposed PostgreSQL RLS policies for future deployment:
-> ```sql
-> -- Ensure users can only query their own record
-> CREATE POLICY users_self ON users FOR SELECT 
->   USING (id = current_setting('app.current_user_id', true)::UUID);
-> 
-> -- Managers can only view employees belonging to their assigned teams
-> CREATE POLICY managers_view_employees ON employees FOR SELECT 
->   USING (EXISTS (
->     SELECT 1 FROM user_team_assignments uta 
->     WHERE uta.user_id = current_setting('app.current_user_id', true)::UUID 
->       AND uta.team_id = employees.team_id 
->       AND uta.access_level IN ('read', 'write', 'admin')
->   ));
-> 
-> -- Managers can only view performance records for their assigned teams
-> CREATE POLICY managers_view_performance ON performance_records FOR SELECT 
->   USING (EXISTS (
->     SELECT 1 FROM user_team_assignments uta 
->     WHERE uta.user_id = current_setting('app.current_user_id', true)::UUID 
->       AND uta.team_id = performance_records.team_id
->   ));
-> ```
-
-> [!NOTE]
-> Admin sessions are treated as global viewers in the current application/session layer, so they receive the full global notification stream while managers and agents remain scoped to their assigned access.
+- PostgreSQL Row Level Security
+- materialized summary views
+- trigger-driven audit/write guards
+- native partitioned `performance_records_*` child tables

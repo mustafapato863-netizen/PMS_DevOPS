@@ -1,101 +1,74 @@
-# PMS Dashboard — DevOps Platform Repository
+# PMS Dashboard DevOps Docs Hub
 
-This repository hosts all infrastructure-as-code, docker container definitions, proxy setups, database scripts, monitoring configurations, and operational runbooks for the PMS Dashboard platform.
+This `DevOps/` folder is the operational and architecture reference for the PMS Dashboard monorepo. It does not contain the live frontend or backend implementation; it documents how the running system is structured, verified, deployed, and supported.
 
-The active application now includes a modular Balanced Scorecard workspace for Managerial and Corporate levels. The older standalone HTML reference and session checklist files have been removed from the live docs flow.
+## What the app currently includes
 
----
+- React + TypeScript frontend in `Frontend/`
+- FastAPI backend in `Backend/`
+- PostgreSQL-backed performance data
+- Redis-backed caching with in-memory fallback
+- Socket.IO notifications persisted to the database
+- Config-driven team onboarding through `Backend/config/teams/`
+- Modular Balanced Scorecard workspace for `Managerial` and `Corporate`
+- Manager-centric Management Overview backed by live BSC config and snapshot tables
 
-## 1. Repository Structure
+## Start here
 
-```
-PMS-DevOps/
-├── .env.example              - Environment configuration template.
-├── README.md                 - This operations overview guide.
-│
-├── compose/                  - Docker Compose files for all environments.
-│   ├── docker-compose.dev.yml
-│   ├── docker-compose.staging.yml
-│   └── docker-compose.prod.yml
-│
-├── docker/                   - Target Dockerfiles.
-│   ├── Dockerfile.backend
-│   └── Dockerfile.frontend
-│
-├── nginx/                    - Proxy configurations.
-│   ├── nginx.conf
-│   └── sites/
-│       └── pms.conf
-│
-├── monitoring/               - Telemetry configurations.
-│   ├── prometheus/
-│   │   └── prometheus.yml
-│   ├── grafana/
-│   │   ├── dashboards/
-│   │   └── provisioning/
-│   └── loki/
-│       └── loki-config.yml
-│
-├── scripts/                  - Operational automation scripts.
-│   ├── deploy.sh
-│   ├── migrate.sh
-│   ├── backup-db.sh
-│   ├── restore-db.sh
-│   ├── health-check.sh
-│   └── rollback.sh
-│
-├── deployment/               - Cloud and self-hosted deploy guides.
-│   ├── railway.md
-│   ├── vercel.md
-│   ├── self-hosted-vps.md
-│   ├── environment-variables.md
-│   └── production-checklist.md
-│
-├── backups/                  - Logical database sql backup target.
-│   └── .gitkeep
-│
-├── restore/                  - Database sql restoration files target.
-│   └── .gitkeep
-│
-└── docs/                     - System architecture and incident runbooks.
-    ├── GIT_WORKFLOW.md
-    ├── INFRASTRUCTURE_RUNBOOK.md
-    ├── INCIDENT_RESPONSE.md
-    └── RELEASE_PROCESS.md
+- [`SYSTEM_STATUS.md`](D:/Projects/PMS_Dashboard/DevOps/SYSTEM_STATUS.md): latest verification snapshot and known issues
+- [`README_PROJECT_STRUCTURE.md`](D:/Projects/PMS_Dashboard/DevOps/README_PROJECT_STRUCTURE.md): where code and responsibilities live
+- [`DATABASE_SCHEMA.md`](D:/Projects/PMS_Dashboard/DevOps/DATABASE_SCHEMA.md): main database tables, relationships, and BSC persistence
+- [`docs/API_REFERENCE.md`](D:/Projects/PMS_Dashboard/DevOps/docs/API_REFERENCE.md): backend route reference
+- [`docs/Architecture.md`](D:/Projects/PMS_Dashboard/DevOps/docs/Architecture.md): higher-level system flow
+
+## Folder map
+
+```text
+DevOps/
+|-- README.md
+|-- DATABASE_SCHEMA.md
+|-- README_PROJECT_STRUCTURE.md
+|-- SYSTEM_STATUS.md
+|-- compose/        # docker-compose files for dev / staging / prod
+|-- docker/         # backend and frontend Dockerfiles
+|-- deployment/     # platform-specific deployment notes
+|-- docs/           # architecture, API, security, troubleshooting, roadmap
+|-- monitoring/     # Prometheus / Grafana / Loki config
+|-- nginx/          # reverse proxy config
+|-- scripts/        # deploy / backup / restore / migrate helpers
+|-- backups/        # backup target
+`-- restore/        # restore target
 ```
 
----
+## Local runtime
 
-## 2. Integration with Application Repositories
+Infrastructure services and the backend can be started from the repo root:
 
-The PMS Dashboard employs a multi-repository approach:
-- **`PMS-Frontend`**: Contains the React single-page portal. Deployed on **Vercel CDN edges** for global file delivery.
-- **`PMS-Backend`**: Contains the FastAPI API logic and database migrations. Deployed on **Railway** container runtimes.
-- **`PMS-DevOps`** (This Repository): Houses all common orchestration configurations, local developer setups, backups, monitoring alerts, and deployment scripts.
-
----
-
-## 3. Deployment Runbooks
-
-### A. Local Development Compose
-To quickly spin up database, cache, and backend APIs for local coding:
-```bash
-docker compose -f compose/docker-compose.dev.yml up -d
+```powershell
+docker compose up --build
 ```
 
-### B. Production Deployment (Self-Hosted VPS)
-To deploy the entire stack (including Nginx proxy, prometheus, and grafana) to a production node:
-```bash
-# Clone DevOps repository, configure .env, then run:
-./scripts/deploy.sh
+Frontend runs separately:
+
+```powershell
+cd Frontend
+npm run dev
 ```
 
-### C. Backup, Migrations, and Restores
-- **Backup DB:** `./scripts/backup-db.sh`
-- **Restore DB:** `./scripts/restore-db.sh backups/pms_backup_latest.sql`
-- **Migrations:** `./scripts/migrate.sh`
-- **Rollback:** `./scripts/rollback.sh`
+Useful validation commands:
 
-### Balanced Scorecard Notes
-- BSC implementation lives in the React frontend, not in this repository.
-- The old demo/reference artifacts were retired after the modular workspace landed in the main app.
+```powershell
+cd Frontend
+npm run build
+npm run lint
+
+cd ..\Backend
+.\.venv\Scripts\python -m pytest tests\test_three_teams.py tests\test_submission_team.py tests\test_services.py -q
+```
+
+## Documentation policy
+
+- Treat `Backend/models/models.py` and active migrations as the source of truth for schema details.
+- Treat `Frontend/src/App.tsx` and `Backend/app.py` as the source of truth for runtime structure.
+- Update `SYSTEM_STATUS.md` only from commands actually run in the current workspace.
+- Keep old demo-only BSC notes out of the main docs flow; the live implementation is now the modular workspace.

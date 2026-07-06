@@ -1,81 +1,139 @@
 # New Team Onboarding Guide
 
-Use this guide to add a new team with the fewest possible changes.
+Use this guide to add a new team with the fewest possible changes and without breaking the existing Balanced Scorecard flow.
 
 ## Source of Truth
 
 - Team config JSON: `Backend/config/teams/*.json`
-- Team creation flow: `Backend/services/team_service.py`
+- Team CRUD and config-backed team payloads: `Backend/services/team_service.py`
+- Team onboarding workflow API: `POST /api/team-management/teams/{team_name}/onboard`
+- Team onboarding status API: `GET /api/team-management/teams/{team_name}/onboarding-status`
 - Config discovery API: `GET /api/config/teams`
 - Team registry API: `GET /api/team-management/teams`
-- Team weights API: `GET /api/settings/weights`
-- Team-specific cleaner: `Backend/Data_Cleaning_Teams/`
-- User access scope, team assignment, and notification visibility are handled centrally in auth/socket flow, not in team onboarding.
+- Management BSC config API: `GET /api/team-management/bsc/configs`
+- Management BSC runtime service: `Backend/services/management_bsc_service.py`
+- Team-specific cleaners: `Backend/Data_Cleaning_Teams/`
 
-## Important Lessons From Submission Onboarding
+Team onboarding is config-first. Add code only when the Excel shape or KPI logic genuinely cannot be expressed in JSON.
 
-Submission exposed two failure modes that should be treated as onboarding rules for every new team:
+## Current Baseline
 
-1. The raw Excel sheet can use a different employee ID/name column set than the legacy default. The import flow must read the values from the team config first and only fall back to legacy column names when config values are missing.
-2. KPI labels in the UI can differ from the raw weight keys in the stored config. The frontend should support both the canonical config key and the legacy display key for the same KPI so weights and contributions still render.
-3. Any row with `Performance Grade` equal to `-`, `New Staff`, or `Leave` must be excluded from import before scoring. This filter belongs to the raw ingestion path, not the calculated performance score.
+As of July 2026, the system already supports nine config-driven teams:
 
-## Required Setup
+- Inbound
+- Outbound
+- Inbound UAE
+- Pre-Approvals IP Offshore
+- Sales
+- Pharmacy
+- Coding
+- CSR
+- Submission
 
-1. Add a JSON file in `Backend/config/teams/`.
-2. Fill in:
-   - `team`
-   - `db_name`
-   - `region`
-   - `employee_id_col`
-   - `employee_name_col`
-   - `grade_thresholds`
-   - `kpis`
-3. Keep KPI weights summing to `1.0`.
-4. Make sure each KPI includes:
-   - `key`
-   - `label`
-   - `weight`
-   - `direction`
-   - `unit`
-   - `color`
-   - `actual_col`
-   - `target_col`
-   - `perspective` (must be one of: `"Financial"`, `"Customer"`, `"Internal Process"`, `"Learning & Growth"`)
-5. Add a cleaner only if the Excel layout is different.
-6. Register the cleaner in `Backend/data_cleaning/cleaner_factory.py` only if auto-discovery does not find it.
-7. Verify the raw workbook column names for employee ID, employee name, and `Performance Grade` before import.
-8. If the KPI key differs between raw config and display logic, document both names in the team onboarding notes.
+The frontend already expects:
 
-## Create and Verify
+- `Employee` KPIs for the standard team dashboard and employee profile
+- `Managerial` and `Corporate` performance levels for the Balanced Scorecard workspace
+- BSC perspectives to come from config and runtime snapshot data, not hardcoded frontend cards
 
-1. Create the team through the normal team-management flow.
-2. Confirm the team appears in:
-   - `/api/config/teams`
-   - `/api/team-management/teams`
-   - `GET /api/settings/weights`
-3. Upload a sample workbook and confirm cleaning works.
-4. Check the team dashboard and employee profile for correct KPI rendering and score calculation.
-5. Confirm weights and contribution values appear for every KPI card, including the new team.
+## Required Team Config Shape
 
-## Rules
+Create one JSON file under `Backend/config/teams/`.
 
-- Prefer config changes over code changes.
-- Do not add hardcoded team branches unless the team has a genuinely unique rule.
-- Keep the unified scoring model unchanged.
-- Keep score capping and weight capping unchanged.
-- Keep raw-grade exclusion in the ingestion layer, not in the scoring layer.
-- Keep UI label-to-weight mapping tolerant of both legacy and canonical KPI keys.
+Minimum root fields:
 
-## When Code Changes Are Needed
+- `team`
+- `db_name`
+- `region`
+- `employee_id_col`
+- `employee_name_col`
+- `grade_thresholds`
+- `kpis`
 
-Only add code when the new team has:
+If the team will use Balanced Scorecard views, also add:
 
-- a different Excel structure
-- a different KPI formula
-- a different cleaner
-- a display rule that cannot be expressed in config
-- a mismatch between raw KPI keys and display labels that requires a safe fallback mapping
+- `performance_levels.Managerial`
+- `performance_levels.Corporate`
+
+Each BSC performance level should contain:
+
+- `balanced_scorecard.enabled`
+- `balanced_scorecard.perspectives`
+- `balanced_scorecard.strategy_map_links`
+- `kpis`
+
+Each KPI entry should include:
+
+- `key`
+- `label`
+- `weight`
+- `direction`
+- `unit`
+- `color`
+- `actual_col`
+- `target_col`
+
+Managerial and Corporate BSC KPI entries must also include:
+
+- `perspective`
+
+Valid BSC perspective keys:
+
+- `Financial`
+- `Customer`
+- `Internal Process`
+- `Learning & Growth`
+
+Keep KPI weights summing to `1.0` within each level.
+
+## Important Lessons From Real Onboarding Work
+
+Submission and the later BSC rollout exposed the rules we should now treat as standard:
+
+1. Excel column names are not universal. Always read employee ID and employee name from the team config first.
+2. Raw KPI keys, display labels, and weight lookup keys can differ. Frontend and backend mapping must tolerate canonical and legacy names when needed.
+3. Rows with `Performance Grade` equal to `-`, `New Staff`, or `Leave` must be filtered during ingestion, before scoring.
+4. BSC cards and trends should render from actual config plus snapshot data. Do not reintroduce hardcoded perspective cards or fake KPI history.
+5. If the team needs Managerial or Corporate BSC, onboarding is not complete until both config and snapshot/config tables can produce live BSC output.
+
+## Minimal Onboarding Flow
+
+1. Add the team JSON in `Backend/config/teams/`.
+2. Confirm the config loads through `GET /api/config/teams`.
+3. Create the team through the normal team-management flow.
+4. Verify the created team appears in `GET /api/team-management/teams`.
+5. Upload a sample workbook and confirm the cleaner maps columns correctly.
+6. Verify `Employee` dashboard KPIs and score calculations.
+7. If BSC applies to the team, verify both `Managerial` and `Corporate` levels:
+   - perspectives load
+   - KPI table loads
+   - scorecard state is not empty for the loaded period
+   - management selection can switch the KPI cards for a selected manager
+8. Run the onboarding workflow endpoint only after config and sample data are ready.
+
+## When Code Changes Are Actually Needed
+
+Only add code when the new team has one of these:
+
+- a different Excel structure that existing cleaners cannot parse
+- a KPI formula that cannot be expressed with the current model
+- a new cleaner requirement
+- a special display rule that config cannot express
+- a safe compatibility mapping requirement between stored KPI keys and displayed labels
+
+Do not add a team-specific branch just because one sample file looks different once.
+
+## Verification Checklist
+
+- `GET /api/config/teams` returns the new team
+- `GET /api/team-management/teams` returns the new team
+- uploaded rows create usable performance data
+- employee IDs and names map correctly
+- grade exclusions are applied before scoring
+- employee dashboard renders expected KPIs
+- employee profile renders expected KPI history
+- BSC renders for every supported performance level the team is supposed to have
+- no empty or unauthorized BSC state appears for valid in-scope users
 
 ## Quick Checks
 
@@ -88,3 +146,5 @@ pytest tests/test_services.py -q
 cd ..\Frontend
 npm run build
 ```
+
+If the new team includes Management BSC data, also verify the relevant BSC endpoints and UI flow with a real uploaded period before calling onboarding complete.

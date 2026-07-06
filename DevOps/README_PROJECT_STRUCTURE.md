@@ -1,265 +1,187 @@
 # PMS Dashboard Project Structure
 
-This guide maps the current repository and explains where the main application responsibilities live. For installation and everyday commands, see [README.md](../README.md).
+This guide maps the current monorepo and points to the main implementation paths. For the latest health snapshot, see [`SYSTEM_STATUS.md`](D:/Projects/PMS_Dashboard/DevOps/SYSTEM_STATUS.md).
 
-## Architecture
+## Runtime shape
 
 ```text
-React + TypeScript frontend
+Frontend (React + TypeScript)
         |
-        | HTTP / Socket.IO
+        | HTTP + Socket.IO
         v
-FastAPI API and middleware
-        |
-        +-- services and processors
-        +-- repositories
-        +-- SQLAlchemy models
+Backend (FastAPI + services + repositories)
         |
         +-- PostgreSQL
         +-- Redis
-        +-- JSON seed/fallback data
+        +-- JSON team configs / fallback data
 ```
 
-The backend entry point is `Backend/app.py`. It mounts the API below `/api`, installs authentication, request timing/performance logging, error-handling, and CORS middleware, seeds database data and permissions during startup, and wraps FastAPI with the Socket.IO ASGI application.
+Main entry points:
 
-The frontend entry point is `Frontend/src/main.tsx`; routes and application providers are composed in `Frontend/src/App.tsx`.
+- Frontend: `Frontend/src/main.tsx`
+- Frontend routes/providers: `Frontend/src/App.tsx`
+- Backend app: `Backend/app.py`
+- Backend ORM schema: `Backend/models/models.py`
 
-## Repository Layout
+## Top-level layout
 
 ```text
 PMS_Dashboard/
 |-- Backend/
-|   |-- api/
-|   |   |-- middleware/          # Authentication, RBAC, error handling
-|   |   `-- routers/             # FastAPI route modules
-|   |-- config/
-|   |   |-- teams/               # JSON KPI definitions used for team onboarding
-|   |   |-- database.py          # SQLAlchemy engine and sessions
-|   |   |-- loader.py            # Team configuration loading/validation
-|   |   |-- logging_config.py    # Structured logging
-|   |   `-- socket_config.py     # Socket.IO server
-|   |-- Data_Cleaning_Teams/     # Team-specific Excel cleaners
-|   |-- data_cleaning/           # Shared cleaning base, mappings, factory
-|   |-- data/                    # JSON seed/fallback application data
-|   |-- exports/                 # Report export support
-|   |-- migrations/              # Alembic environment and revisions
-|   |-- models/                  # ORM models and API schemas
-|   |-- processors/              # Excel processing orchestration
-|   |-- repositories/            # Database and JSON data access
-|   |-- scripts/                 # JSON-to-database migration scripts
-|   |-- services/                # Application and domain logic
-|   |-- tests/                   # Backend unit and integration tests
-|   |-- app.py                   # FastAPI/Socket.IO application
-|   |-- alembic.ini              # Migration configuration
-|   |-- Dockerfile               # Backend container image
-|   `-- requirements.txt         # Pinned backend dependencies
-|-- Database/                    # SQL schema reference documents (pms_scheme.sql)
-|-- DevOps/                      # Centralized infrastructure, deployment, and operations repository
-|   |-- README.md                # DevOps operations overview guide
-|   |-- .env.example             # Environment configuration template
-|   |-- DATABASE_SCHEMA.md       # Database schema and relationships reference
-|   |-- README_PROJECT_STRUCTURE.md # This guide
-|   |-- SYSTEM_STATUS.md         # System verification status and verification checks
-|   |-- backups/                 # Database backup targets
-|   |-- compose/                 # Docker Compose files for all environments (dev, staging, prod)
-|   |-- deployment/              # Cloud and self-hosted deploy guides
-|   |-- docker/                  # Target backend and frontend Dockerfiles
-|   |-- docs/                    # Detailed architectural deep-dives
-|   |   |-- ADR.md               # Architecture Decision Records
-|   |   |-- API_REFERENCE.md     # Public REST API endpoint details
-|   |   |-- Architecture.md      # High-level system architecture and dataflows
-|   |   |-- Backend.md           # FastAPI routers, middleware, and schemas
-|   |   |-- BOOTSTRAP_FLOW.md    # Sequence diagrams for frontend startup loading gates
-|   |   |-- CHANGELOG.md         # Semantic version release records
-|   |   |-- DATABASE_ERD.md      # Database tables schema relationships mapping
-|   |   |-- DashboardFlow.md     # Visual aggregation metrics and filters
-|   |   |-- Deployment.md        # Production servers, backup scripts, and logs
-|   |   |-- Frontend.md          # React components, stores, hooks, and routing
-|   |   |-- GIT_WORKFLOW.md      # Multi-repository branching strategies and tag rules
-|   |   |-- INCIDENT_RESPONSE.md # Emergency playbooks and severity levels
-|   |   |-- Infrastructure.md    # Docker settings, caching fallbacks, constraints
-|   |   |-- INFRASTRUCTURE_RUNBOOK.md # Operations command guides and database dump tools
-|   |   |-- KPIScoringEngine.md  # Detailed math, capping, and grading calculations
-|   |   |-- NotificationArchitecture.md # WebSockets, channels, and scoping rules
-|   |   |-- PERFORMANCE.md       # Caching invalidations and queries optimization
-|   |   |-- RELEASE_PROCESS.md   # Branch freezes, QA validations, semantic tags
-|   |   |-- REQUEST_LIFECYCLE.md # Request/response layers sequence diagrams
-|   |   |-- Roadmap.md           # Infrastructure expansion roadmap
-|   |   |-- Security.md          # JWT lifecycles, user suspension checks, RBAC
-|   |   |-- TROUBLESHOOTING.md   # Known issues diagnostic runbooks
-|   |   `-- UploadPipeline.md    # Excel cleaner factory, transactions, and audit logs
-|   |-- monitoring/              # Prometheus, Grafana, and Loki telemetry configuration
-|   |-- nginx/                   # Nginx reverse proxy configurations
-|   |-- restore/                 # Database restoration targets
-|   `-- scripts/                 # Operations automation scripts (deploy, backup, restore, etc.)
 |-- Frontend/
-|   |-- public/                  # Static public assets
-|   |-- src/
-|   |   |-- components/          # Common, chart, employee, team UI
-|   |   |   `-- balanced-scorecard/ # Modular BSC cards, gauge, trends, and scorecard views
-|   |   |-- constants/           # Shared constants
-|   |   |-- context/             # Auth, role, and theme providers
-|   |   |-- data/                # Bundled frontend data
-|   |   |-- hooks/               # Query, URL, store, and socket hooks
-|   |   |-- lib/                 # API client and query client
-|   |   |-- pages/               # Route-level views (e.g. BalancedScorecardView.tsx)
-|   |   |-- schemas/             # Zod validation schemas
-|   |   |-- services/            # Frontend analytics helpers
-|   |   |-- store/               # Zustand state
-|   |   |-- App.tsx              # Providers, guards, and routes
-|   |   |-- config.ts            # API and Socket.IO URLs
-|   |   `-- main.tsx             # Browser entry point
-|   |-- package.json             # Scripts and dependencies
-|   `-- vite.config.ts           # Vite configuration
-|-- NEW_TEAM_ONBOARDING.md       # New team onboarding guide
-|-- THREE_TEAMS_KPI_CALCULATION_GUIDE.md # Three-team KPI calculation guide
-|-- setup_project.ps1            # Unified setup script for Backend & Frontend dependencies
-|-- README.md                    # Main project landing page / feature overview
+|-- DevOps/
+|-- Database/
+|-- NEW_TEAM_ONBOARDING.md
+|-- THREE_TEAMS_KPI_CALCULATION_GUIDE.md
+`-- setup_project.ps1
 ```
 
-Generated logs, caches, virtual environments, package installations, and build outputs are omitted from the map.
-
-## Backend Modules
-
-### API Layer
-
-`Backend/api/routers/__init__.py` assembles the route modules:
-
-| Module | Responsibility |
-| --- | --- |
-| `auth.py` | Login and logout |
-| `performance.py` | Performance queries, planning, insights, and exports |
-| `employee.py` | Employee CRUD, search, restore, notes, and actions |
-| `team.py` | Team actions |
-| `settings.py` | KPI weights and targets |
-| `upload.py` | PMS workbook uploads |
-| `config.py` | Team configuration discovery |
-| `team_management.py` | Team CRUD, validation, and onboarding |
-| `bulk_operations.py` | Bulk records, KPI updates, and employee deletion |
-| `health.py` | Database/cache health reporting |
-| `vitals.py` | Frontend web-vitals ingestion |
-| `users_and_actions.py` | DB-backed users and corrective actions (with Super Admin account protections) |
-
-### Service and Data Layers
-
-- `services/` contains authentication, employee, performance, KPI, planning, learning, insights, caching, auditing, versioning, onboarding, health, and notification logic.
-  - **Notification Service (`services/notification_service.py`)**: Handles saving notifications to the database and routing them to target recipient lists (Admins get global/all notifications, Managers get notifications for their assigned teams).
-  - **QueryOptimizer** [Implemented / Not Primary Path]: An optimized database query path with Redis caching. Fully implemented and tested but not used by default in the active dashboard paths (which use primary database reads).
-  - **Redis Caching & Fallback**: Active caching client with automated LRU in-memory cache fallbacks when Redis is offline.
-- `repositories/` isolates database and JSON access.
-  - **DB-First Dashboard Read Path**: The dashboard reads directly from the PostgreSQL database, using local JSON repositories strictly as fallback data when DB records are unavailable.
-  - **Performance Optimization**: `PerformanceRepository` implements SQL-level filtering (`get_dashboard_record_keys`) and utilizes `selectinload(kpi_values)` to load KPI scores efficiently and eliminate N+1 query overhead.
-- `models/models.py` and `models/team_models.py` define SQL database persistence models; `models/schemas.py` defines request and response schemas.
-- `migrations/versions/` contains the Alembic database migration history (PostgreSQL RLS, materialized views, and partitioning are planned for upcoming deployment, not yet active in migrations).
-- `data/` supplies seed or fallback JSON records. Treat these files as application data, not test fixtures.
-
-### KPI and Excel Pipeline
+## Backend
 
 ```text
-Excel workbook
-  -> ExcelProcessor
-  -> CleanerFactory
+Backend/
+|-- api/
+|   |-- middleware/     # auth, request timing, error handling
+|   `-- routers/        # FastAPI route modules
+|-- config/
+|   |-- teams/          # config-driven team definitions
+|   |-- database.py
+|   |-- loader.py
+|   |-- logging_config.py
+|   `-- socket_config.py
+|-- data_cleaning/      # shared cleaning framework
+|-- Data_Cleaning_Teams/# team-specific cleaners
+|-- migrations/         # Alembic revisions
+|-- models/             # ORM models and Pydantic schemas
+|-- processors/         # Excel ingestion orchestration
+|-- repositories/       # persistence access layer
+|-- services/           # business logic
+|-- tests/              # backend tests
+|-- utils/
+|-- app.py
+`-- requirements.txt
+```
+
+### Backend responsibilities
+
+- `api/routers/performance.py`
+  Performance endpoints, dashboards, employee history, and Balanced Scorecard APIs
+- `services/performance_service.py`
+  Standard dashboard aggregation
+- `services/balanced_scorecard_service.py`
+  Standard BSC response shaping from authorized records
+- `services/management_bsc_service.py`
+  Managerial/Corporate BSC config + snapshot runtime, history, imports, and Management Overview behavior
+- `services/team_service.py`
+  Team CRUD with config-backed payload building
+- `services/team_onboarding_service.py`
+  Team onboarding workflow state and execution
+- `processors/` + `data_cleaning/`
+  Excel-to-record ingestion path
+
+### Key backend data flows
+
+```text
+Excel upload
+  -> processor
+  -> cleaner factory
   -> team-specific cleaner
-  -> normalized KPI values
-  -> KPIService calculation and grading
-  -> repository/database storage
+  -> normalized KPI rows
+  -> KPI/performance services
+  -> PostgreSQL tables
 ```
 
-Shared cleaning behavior lives in `Backend/data_cleaning/`. Individual cleaners live in `Backend/Data_Cleaning_Teams/`. The cleaner factory maps configured team names to their processing functions.
-
-Each file in `Backend/config/teams/` declares:
-
-- Team name and region
-- Employee ID and name source columns
-- Grade thresholds
-- KPI keys, labels, weights, units, and colors
-- Actual and target source columns
-- KPI metadata including configuration properties (KPI direction, weight, keys). Runtime scoring follows the unified scoring model:
-  - KPI Achievement preserves the employee's real performance and may exceed 100%.
-  - Effective Achievement is capped at 100% for contribution calculation.
-  - KPI Contribution is calculated from Effective Achievement and KPI Weight.
-  - A KPI Contribution can never exceed its configured weight share.
-  - Final Performance Score is the sum of all KPI contributions and can never exceed 100%.
-
-New team onboarding stays config-first:
-
-1. Add the team JSON config.
-2. Add a cleaner only if the workbook shape differs.
-3. Let `Backend/services/team_service.py` build the database payload from config when available.
-4. Verify discovery through the config and team-management APIs.
-
-## Frontend Modules
-
-The authenticated route tree in `Frontend/src/App.tsx` includes:
-
-| Route | View | Access |
-| --- | --- | --- |
-| `/executive` | Executive summary | Authenticated users |
-| `/team/:teamId` | Team dashboard | Authenticated users |
-| `/employee/:employeeId` | Employee profile | Authenticated users |
-| `/planning` | Planning workspace | Admin, Manager, Executive |
-| `/team-management` | Team administration | Admin |
-| `/settings` | Settings | Authenticated users |
-| `/api/users` | User management | Admin only |
-
-Unauthenticated users are redirected to `/login`. `/operational` redirects to `/team/all`.
-
-Data access is centered on `src/lib/apiClient.ts`, TanStack Query hooks under `src/hooks/api/`, and the central URLs in `src/config.ts`. Socket hooks handle real-time updates and notifications, with Admin sessions subscribing to the global notification stream and Manager/Agent sessions staying scoped to assigned access.
-
-### Balanced Scorecard Frontend Layout
-
-The BSC workspace is split into focused pieces under `Frontend/src/components/balanced-scorecard/` and `Frontend/src/components/team/`:
-
-- `Frontend/src/components/team/BalancedScorecardWorkspace.tsx` composes the workspace layout.
-- `Frontend/src/components/balanced-scorecard/BSCRightRail.tsx` renders the total score card, trend cards, and selected KPI rail state.
-- `Frontend/src/components/balanced-scorecard/GaugeSVG.tsx` draws the score gauge.
-- `Frontend/src/components/balanced-scorecard/StrategyMapView.tsx` and `Frontend/src/components/balanced-scorecard/PerspectiveSummaryView.tsx` handle the two main BSC views.
-
-The old single-file demo HTML and the separate BSC session-note docs are no longer part of the active implementation.
-
-## Configuration
-
-Common backend environment variables:
-
-| Variable | Purpose |
-| --- | --- |
-| `DATABASE_URL` | PostgreSQL SQLAlchemy connection URL |
-| `REDIS_URL` | Redis connection URL |
-| `JWT_SECRET` | Token signing secret |
-| `JWT_ALGORITHM` | Token algorithm |
-| `JWT_EXPIRE_MINUTES` | Token lifetime |
-| `PMS_DATA_DIR` | Runtime data directory |
-| `PMS_DEFAULT_FILE_PATH` | Default workbook path |
-| `PORT` | Container API port |
-
-Frontend build-time variables:
-
-| Variable | Purpose | Default |
-| --- | --- | --- |
-| `VITE_API_BASE_URL` | Backend HTTP origin | `http://localhost:8000` |
-| `VITE_SOCKET_URL` | Socket.IO origin | `http://localhost:8000` |
-
-`VITE_API_URL` remains a fallback alias for the HTTP origin.
-
-## Tests and Validation
-
-Backend tests are under `Backend/tests/`, with additional root-level backend test scripts. The suite covers routers, authentication/RBAC, repositories, services, caching, monitoring, bulk operations, soft deletion, versioning, and the four newer KPI teams (Coding, CSR, Pharmacy, and Submission).
-
-```powershell
-cd Backend
-pytest tests -v
-pytest tests/test_three_teams.py -v
-pytest tests/test_submission_team.py -v
+```text
+Team config JSON
+  -> config loader
+  -> team service / BSC services
+  -> frontend config + dashboard responses
 ```
 
-Frontend validation uses the scripts declared in `Frontend/package.json`:
+## Frontend
 
-```powershell
-cd Frontend
-npm run lint
-npm run build
+```text
+Frontend/
+|-- public/
+|-- src/
+|   |-- components/
+|   |   |-- balanced-scorecard/
+|   |   |-- common/
+|   |   |-- employee/
+|   |   |-- executive/
+|   |   |-- notifications/
+|   |   |-- team/
+|   |   `-- team-management/
+|   |-- context/
+|   |-- hooks/
+|   |   `-- api/
+|   |-- lib/
+|   |-- pages/
+|   |-- schemas/
+|   |-- services/
+|   |-- store/
+|   |-- types.ts
+|   |-- App.tsx
+|   |-- config.ts
+|   |-- index.css
+|   `-- main.tsx
+|-- package.json
+`-- vite.config.ts
 ```
 
-Avoid recording fixed passing-test counts or performance/SLA claims in this document; those values should come from the current CI run and monitoring environment.
+### Frontend routes
 
-The authenticated app shell is wrapped in a root error boundary so a page crash falls back to a safe screen instead of taking down the whole UI. Browser vitals reporting in `Frontend/src/main.tsx` is best-effort and ignores a missing `/api/vitals` endpoint.
+Routes in `Frontend/src/App.tsx`:
+
+- `/login`
+- `/executive`
+- `/team/:teamId`
+- `/employee/:employeeId`
+- `/planning`
+- `/team-management`
+- `/settings`
+
+Role behavior:
+
+- `Agent` users are forced to their own employee page
+- `Admin`, `Manager`, and `Executive` can access the broader dashboard shell
+- Team management is admin-only
+
+### Balanced Scorecard frontend
+
+Main BSC files:
+
+- `Frontend/src/components/team/BalancedScorecardWorkspace.tsx`
+- `Frontend/src/components/balanced-scorecard/StrategyMapView.tsx`
+- `Frontend/src/components/balanced-scorecard/BSCRightRail.tsx`
+- `Frontend/src/components/balanced-scorecard/KpiTablePanel.tsx`
+- `Frontend/src/components/balanced-scorecard/KpiTrendPanel.tsx`
+- `Frontend/src/components/balanced-scorecard/ManagerRosterPanel.tsx`
+- `Frontend/src/components/balanced-scorecard/ManagerSummarySection.tsx`
+- `Frontend/src/hooks/api/useBalancedScorecard.ts`
+
+Current BSC behavior:
+
+- `Corporate` drives Strategic Overview
+- `Managerial` drives Management Overview
+- Management Overview is manager-centric: selecting a manager updates KPI cards, details, and rail state from live API data
+- The page title for Strategic Overview uses the highest available position in the team when present
+
+## DevOps docs
+
+```text
+DevOps/
+|-- README.md
+|-- DATABASE_SCHEMA.md
+|-- README_PROJECT_STRUCTURE.md
+|-- SYSTEM_STATUS.md
+|-- compose/
+|-- deployment/
+|-- docker/
+|-- docs/
+|-- monitoring/
+|-- nginx/
+`-- scripts/
+```
+
+Use `DevOps/docs/` for deep dives and runbooks. The four root docs in `DevOps/` should stay concise and current.
