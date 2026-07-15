@@ -7,7 +7,7 @@ services:
     environment:
       POSTGRES_DB: PMS_Sys_Staging
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: stagingpassword123
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "5433:5432"
     volumes:
@@ -39,9 +39,9 @@ services:
     ports:
       - "8080:7860"
     environment:
-      - DATABASE_URL=postgresql://postgres:stagingpassword123@db:5432/PMS_Sys_Staging
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/PMS_Sys_Staging
       - REDIS_URL=redis://redis:6379/0
-      - JWT_SECRET=stagingsecretkey12345
+      - JWT_SECRET=${JWT_SECRET}
       - JWT_ALGORITHM=HS256
       - JWT_EXPIRE_MINUTES=1440
       - PMS_DATA_DIR=/app/data

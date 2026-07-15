@@ -1,0 +1,8 @@
+DevOps/.env
+DevOps/.env.local
+DevOps/.env.development
+DevOps/.env.production
+DevOps/.env.staging
+DevOps/*.bak
+DevOps/*.backup
+DevOps/*.tmp
