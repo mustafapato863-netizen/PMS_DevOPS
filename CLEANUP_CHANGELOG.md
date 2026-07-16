@@ -1,152 +1,152 @@
 # PMS Dashboard Cleanup Changelog
 
-Cleanup date: 2026-07-16
+Cleanup and hardening date: 2026-07-16
 
 ## Boundary
 
-This cleanup applied only high-confidence, reversible changes identified by the read-only audit. It did not alter UI design, business logic, calculations, API contracts, database behavior, permissions, or user workflows.
+Changes were made on `codex/comprehensive-hardening` in the root, Backend, and Frontend repositories. `main` retains the previously pushed `Safe Version` reference. No automatic merge or history rewrite was performed.
 
-## Group 1: Generated frontend artifacts
+## Phase 1: Safe audit cleanup
 
 ### Removed
 
 - `Frontend/lint_output.txt`
 - `Frontend/lint_output_utf8.txt`
-
-Reason: both files were stored ESLint command output, had no source/runtime references, and were not application assets.
-
-### Changed
-
-- `Frontend/.gitignore`: added `lint_output*.txt` to prevent regeneration from being committed.
-
-### Verification
-
-- `npm run test:summary`: 2 passed.
-- `npm run build`: passed.
-
-## Group 2: Unsafe diagnostic tests
-
-### Removed
-
 - `Backend/test_integration.py`
-  - removed `test_user_repository`
-  - removed `test_team_repository`
 - `Backend/test_team_service.py`
-  - removed `test_team_service`
+- Sixteen tracked Backend `__pycache__/*.pyc` artifacts
 
-Reason: these functions opened the configured `SessionLocal` database, printed user/team data, contained no assertions, and swallowed exceptions. They could report success while failing and were unsafe to run as part of pytest.
-
-### Retained coverage
-
-Repository and service behavior remains covered by:
-
-- `Backend/tests/test_repositories.py`
-- `Backend/tests/test_services.py`
-- `Backend/tests/test_api_routers.py`
-- `Backend/tests/test_integration_stage_4_7.py`
-- `Backend/tests/test_soft_delete.py`
-
-### Verification
-
-- All-tests collection changed from 341 to 338 exactly as expected.
-- The canonical `Backend/tests` suite remained at 338 collected tests.
-
-## Group 3: Sensitive logging cleanup
+The two test files contained three collected diagnostic functions with no assertions, direct configured-database access, sensitive prints, and swallowed exceptions. Canonical repository, service, API, rollback, and integration tests were retained.
 
 ### Changed
 
-- `Backend/api/routers/users_and_actions.py`
-  - removed three console prints containing JWT decode exception details.
-- `Backend/api/routers/upload.py`
-  - removed two direct traceback prints.
-- `Backend/services/cache_service.py`
-  - removed Redis URL and connection exception details from fallback logging.
+- Added ignore coverage for generated lint output.
+- Removed JWT decode exception prints, upload tracebacks, and Redis URL/error details from logs.
 
-The control flow, catch behavior, response payloads, status behavior, and cache fallback remained unchanged.
+## Phase 2: Sensitive data and runtime safety
 
-### Verification
+### Removed from tracking
 
-- Python compileall: passed.
-- `tests/test_upload_router.py` plus `tests/test_cache.py`: 11 passed.
-- OpenAPI: 66 paths and 77 operations.
+- `Backend/data/corrective_actions.json`
+- `Backend/data/employees.json`
+- `Backend/data/kpi_weights.json`
+- `Backend/data/manager_notes.json`
+- `Backend/data/performance_records.json`
+- `Backend/data/targets.json`
+- `Backend/data/team_actions.json`
+- `Backend/data/uploads.json`
+- `Backend/data/users.json`
+- `Frontend/src/data/all_months_performance.json`
 
-## Group 4: Tracked Python bytecode
+Local Backend copies remain ignored for private runtime compatibility. `Backend/data/README.md` documents provisioning. Production fails fast for missing required private data; development/test may initialize empty stores.
+
+## Phase 3: Security hardening
+
+### Backend
+
+- Added explicit `APP_ENV`, `CORS_ORIGINS`, and `MAX_UPLOAD_BYTES` configuration.
+- Applied the CORS allowlist to HTTP and Socket.IO and rejected wildcard origins.
+- Restricted legacy unauthenticated access to explicit development/test contexts.
+- Preserved dependency overrides while obtaining authentication database sessions in tests.
+- Replaced token and generic server error disclosure with stable public messages.
+- Added `services/upload_security.py` for bounded reads, basename handling, extension/signature validation, and size/empty-file rejection.
+- Applied upload security to performance uploads and BSC template uploads.
+
+### DevOps
+
+- Added Redis passwords, authenticated URLs, and authenticated health checks in dev, staging, and production.
+- Required the production Grafana administrator password with no fallback.
+- Added named persistent volumes.
+- Removed obsolete Compose schema versions.
+- Added Nginx `client_max_body_size 25m`.
+- Updated `.env.example` without adding secret values.
+
+## Phase 4: Frontend integrity and simplification
 
 ### Removed
 
-- 16 tracked `Backend/**/__pycache__/*.pyc` files.
+- `Frontend/src/pages/OperationalView.tsx`
 
-Reason: these are interpreter-generated Python 3.13 artifacts, not source files. The existing `Backend/.gitignore` already contains `__pycache__/` and `*.pyc`, so they will remain ignored after removal from Git.
+Reason: import and route tracing proved the legacy page unreachable and duplicated the current operational workflow.
 
-### Verification
+### Consolidated or simplified
 
-- Python compileall regenerated valid bytecode successfully.
-- Focused upload/cache tests remained 11/11 passing.
-- Generated bytecode was removed again after verification so the final working tree contains the intended deletions.
+- Replaced the sensitive data fallback with API-only loading and an empty state.
+- Centralized Balanced Scorecard API response types.
+- Split Auth context/hook definitions from the Provider.
+- Moved gauge-tone and manager-snapshot helpers out of component modules.
+- Removed unused KPI card and KPI-key implementations.
+- Corrected shared team, location, onboarding, chart, employee history, notification, and socket types.
+- Removed render-time ref access, static component creation, state-in-effect violations, unsafe `any` usage, and obsolete React Query state values.
+- Preserved current UI layout and user-facing calculations.
 
-## Reports added
+## Phase 5: Dependency remediation
 
-- `SYSTEM_AUDIT_REPORT.md`
-- `CLEANUP_CHANGELOG.md`
+- Updated `react-router-dom` to `^7.18.1`.
+- Updated Vite to `^8.1.4`.
+- Updated affected lockfile transitive packages with `npm audit fix`.
+- Dependencies removed: none.
+- Dependencies added: none.
+- Direct dependency count remained 15 runtime + 12 development.
+- `npm audit` improved from three high-severity findings to zero.
 
-## Dependencies
+## Tests
 
-- Removed: none.
-- Frontend direct dependency count: 27 before, 27 after, including dev dependencies.
-- Backend requirements count: 22 before, 22 after.
+### Added
 
-No dependency met the required proof threshold for removal.
+- `Backend/tests/test_auth_hardening.py`
+- `Backend/tests/test_cors_hardening.py`
+- `Backend/tests/test_runtime_data_security.py`
+- `Backend/tests/test_upload_security.py`
 
-## Removal totals
+### Updated
 
-- Files removed: 20.
-- Generated artifacts removed: 18 (2 lint outputs and 16 Python bytecode files).
-- Unsafe diagnostic test files removed: 2, containing 3 collected test functions.
+- Corrected stale expectations/fixtures in batch, performance-level, upload, and Balanced Scorecard tests to match canonical current behavior.
+- Reused the canonical KPI row-key resolver so production calculation and tests use the same aliases.
 
-## Consolidations
+### Removed
 
-- Files consolidated: none.
-- Code paths consolidated: none.
+No canonical test was removed during hardening. The only removed tests were the three unsafe diagnostics listed in Phase 1.
 
-Potential legacy/duplicate paths were documented rather than changed because consolidation could alter behavior.
+## Verification by group
+
+| Group | Verification |
+| --- | --- |
+| Sensitive data/runtime | runtime-data tests, Frontend build, tracked-file inspection |
+| CORS/auth | focused hardening tests, full Backend suite |
+| Uploads | router tests, signature/size/path tests, full Backend suite |
+| Error handling | router tests and OpenAPI generation |
+| DevOps | dev/staging/prod Compose config validation |
+| Frontend types/hooks | TypeScript and ESLint after each batch |
+| Dependencies | production build, summary tests, npm audit |
 
 ## Final verification
 
-### Passed
+- Backend full suite: `347 passed, 0 failed`.
+- Backend source compile: passed.
+- Backend requirements compatibility: passed.
+- Alembic: one head, `c1a8f6d2e4b7`.
+- OpenAPI: 66 paths, 77 operations.
+- Frontend TypeScript: passed.
+- Frontend ESLint: passed with zero warnings.
+- Frontend production build: passed.
+- Frontend summary tests: 2/2 passed.
+- Frontend npm audit: zero vulnerabilities.
+- Docker Compose dev/staging/prod: all passed.
 
-- Frontend summary tests: 2/2.
-- Frontend production build.
-- Backend focused upload/cache tests: 11/11.
-- Backend atomicity and rollback tests: 2/2.
-- Backend compileall.
-- Backend test collection: 338.
-- OpenAPI generation: 66 paths, 77 operations.
-- Python dependency compatibility via `pip check`.
-- Alembic single-head and history checks.
-- Docker Compose validation for dev, staging, and production.
+## Removal totals
 
-### Existing failures retained
+- Phase 1 removed files/artifacts: 20.
+- Hardening removed sensitive/dead source files: 11.
+- Total removed tracked files/artifacts across both phases: 31.
+- Test functions removed: 3 unsafe diagnostics.
+- Canonical tests removed: 0.
+- Dependencies removed: 0.
 
-- Frontend ESLint: 154 errors and 5 warnings before and after.
-- Frontend TypeScript project check: 185 errors.
-- Backend full suite: 26 failed and 312 passed before and after.
-- npm production audit: 3 high-severity records.
+## Remaining manual actions
 
-The exact same 26 Backend test node IDs failed before and after cleanup. No failure was hidden, reclassified without evidence, or weakened.
-
-## Database safety
-
-- No Alembic upgrade/downgrade was run.
-- No destructive database command was run.
-- The unsafe production-configured diagnostic tests were collected only before removal; they were not executed.
-- Atomicity and explicit rollback tests passed.
-- Application lifespan startup was not invoked because it can seed the configured database.
-
-## Remaining manual work
-
-- Remove or anonymize tracked employee/performance/action data only after replacing active fallback and legacy consumers.
-- Purge historical `.env` and sensitive data through a coordinated Git history rewrite and rotate credentials.
-- Resolve the existing backend test, frontend lint, and frontend TypeScript baselines.
-- Harden CORS, compatibility authentication, uploads, raw error responses, Redis, and Grafana in a separately approved security phase.
-- Patch the audited npm vulnerabilities with regression testing.
-- Review the 26 statically unreachable frontend files with product ownership before deletion.
+- Rotate historical credentials and rewrite Git history before public exposure.
+- Complete database/object-storage migration for private JSON compatibility data.
+- Add dedicated secret, Python dependency, and SAST scanning to CI.
+- Review the remaining statically unreachable Frontend files with product ownership.
+- Address Pydantic and timezone deprecations in a separately tested compatibility phase.

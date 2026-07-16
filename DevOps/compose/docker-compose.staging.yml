@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   db:
     image: postgres:15-alpine
@@ -21,12 +19,15 @@ services:
   redis:
     image: redis:7-alpine
     container_name: pms_redis_cache_staging
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:?REDIS_PASSWORD is required}"]
     ports:
       - "6380:6379"
     volumes:
       - redis_data_staging:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "REDISCLI_AUTH=$${REDIS_PASSWORD} redis-cli ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -39,13 +40,18 @@ services:
     ports:
       - "8080:7860"
     environment:
+      - APP_ENV=staging
       - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/PMS_Sys_Staging
-      - REDIS_URL=redis://redis:6379/0
+      - REDIS_URL=redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379/0
       - JWT_SECRET=${JWT_SECRET}
       - JWT_ALGORITHM=HS256
       - JWT_EXPIRE_MINUTES=1440
       - PMS_DATA_DIR=/app/data
+      - CORS_ORIGINS=${CORS_ORIGINS}
+      - MAX_UPLOAD_BYTES=${MAX_UPLOAD_BYTES:-26214400}
       - PORT=7860
+    volumes:
+      - backend_data_staging:/app/data
     depends_on:
       db:
         condition: service_healthy
@@ -56,3 +62,4 @@ services:
 volumes:
   postgres_data_staging:
   redis_data_staging:
+  backend_data_staging:
