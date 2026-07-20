@@ -15,6 +15,10 @@ fi
 
 echo "[INFO] Executing database migrations to the latest head revision..."
 
+# The historical chain assumes an existing schema. Bootstrap only a truly
+# empty database; non-empty databases continue through the normal Alembic path.
+python scripts/bootstrap_schema.py
+
 # Run alembic upgrade head
 if alembic upgrade head; then
   echo "[SUCCESS] Schema migrations applied successfully."

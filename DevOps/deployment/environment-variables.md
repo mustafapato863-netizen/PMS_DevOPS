@@ -12,9 +12,10 @@ The following properties configure the FastAPI application server, database mapp
 | :--- | :--- | :--- | :--- |
 | `PORT` | Integer | `7860` | Network port mapped inside containers. |
 | `DATABASE_URL` | Connection URL | N/A | PostgreSQL connection string (`postgresql://user:pass@host:5432/db`). |
-| `DATABASE_POOL_SIZE` | Integer | `20` | Maximum persistent database connections. |
-| `DATABASE_MAX_OVERFLOW`| Integer | `10` | Temporary database connection overflow headroom. |
+| `DATABASE_POOL_SIZE` | Integer | `20` development / `5` hosted | Maximum persistent database connections. |
+| `DATABASE_MAX_OVERFLOW`| Integer | `10` development / `0` hosted | Temporary database connection overflow headroom. |
 | `DATABASE_POOL_RECYCLE`| Integer | `1800` | Bumps stale database connections after specified seconds. |
+| `PMS_AUTO_SEED` | Boolean | `false` outside development | Seeds the bundled workbook only when explicitly enabled; keep disabled in hosted production. |
 | `REDIS_URL` | Connection URL | N/A | Redis caching instance string (`redis://:pass@host:6379/0`). |
 | `JWT_SECRET` | String | N/A | Encryption key used to sign session cookies and JWTs. |
 | `JWT_ALGORITHM` | String | `HS256` | Encryption token hashing format. |
