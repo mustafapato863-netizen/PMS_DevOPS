@@ -6,3 +6,8 @@ DevOps/.env.staging
 DevOps/*.bak
 DevOps/*.backup
 DevOps/*.tmp
+
+# Local verification and handover artifacts
+/output/
+/tmp/
+/Handover/*.zip

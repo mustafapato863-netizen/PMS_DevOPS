@@ -18,7 +18,7 @@ Team onboarding is config-first. Add code only when the Excel shape or KPI logic
 
 ## Current Baseline
 
-As of July 2026, the system already supports nine config-driven teams:
+As of July 2026, the system supports thirteen config-driven teams:
 
 - Inbound
 - Outbound
@@ -29,6 +29,10 @@ As of July 2026, the system already supports nine config-driven teams:
 - Coding
 - CSR
 - Submission
+- Re-Submission
+- Pre-Approvals OP Dubai
+- Pre-Approvals IP Final Dubai
+- Marketing
 
 The frontend already expects:
 
@@ -72,6 +76,21 @@ Each KPI entry should include:
 - `color`
 - `actual_col`
 - `target_col`
+- `aggregation.method`
+
+Valid team-dashboard aggregation methods:
+
+- `ratio`: rate calculated from pooled volumes. Requires `numerator_col` and `denominator_col`.
+- `weighted_average`: average weighted by operational volume. Requires `weight_col`.
+- `sum`: additive volumes such as handled queries or revenue.
+- `average`: non-additive observations such as quality audit scores.
+
+Use `$geo.bookings`, `$geo.attended`, `$calls.total_handled`, and `$calls.abandoned`
+when the source is a normalized AgentRecord field rather than a raw Excel column.
+Never choose `average` for a rate when its numerator and denominator are available.
+For `ratio` and `weighted_average`, use the exact column names persisted in API
+`raw_data` after cleaning; they may differ from the original workbook headers.
+Confirm those configured sources are populated in a processed sample before approval.
 
 Managerial and Corporate BSC KPI entries must also include:
 
@@ -104,6 +123,8 @@ Submission and the later BSC rollout exposed the rules we should now treat as st
 4. Verify the created team appears in `GET /api/team-management/teams`.
 5. Upload a sample workbook and confirm the cleaner maps columns correctly.
 6. Verify `Employee` dashboard KPIs and score calculations.
+   - reconcile every team rate as pooled numerator ÷ pooled denominator
+   - confirm current, previous, trend, and baseline use the configured aggregation
 7. If BSC applies to the team, verify both `Managerial` and `Corporate` levels:
    - perspectives load
    - KPI table loads
